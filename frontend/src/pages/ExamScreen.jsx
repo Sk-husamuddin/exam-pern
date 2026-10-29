@@ -130,7 +130,7 @@ export default function ExamScreen() {
     }
   }
 
-  function violation(reason) {
+  async function violation(reason) {
     if (!armed) return;
     const now = Date.now();
     if (now - lastV < 1500) return;
