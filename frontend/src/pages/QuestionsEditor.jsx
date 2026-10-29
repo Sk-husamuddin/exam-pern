@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost, apiPut, apiDelete, apiFormPost } from '../lib/api.js';
+import Loading from '../components/Loading.jsx';
 
 export default function QuestionsEditor() {
   const { examId } = useParams();
   const [exam, setExam] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [draft, setDraft] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [flash, setFlash] = useState(null);
 
@@ -26,12 +28,15 @@ export default function QuestionsEditor() {
 
   async function loadExam() {
     try {
+      setLoading(true);
       const json = await apiGet(`/faculty/exams/${examId}`);
       setExam(json.exam);
       setQuestions(json.exam.questions || []);
       setDraft(json.exam.status === 'draft');
     } catch (err) {
       setError('Failed to load exam');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -136,6 +141,8 @@ export default function QuestionsEditor() {
 
   return (
     <div style={style.page}>
+      {loading && <Loading />}
+      {!loading && (
       <nav style={style.nav}>
         <Link to="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</Link>
         <span style={style.spacer}></span>

@@ -190,6 +190,9 @@ router.get('/state', verifyStudentSession, async (req, res) => {
       }
     }
 
+    // Update last_seen so the monitor shows the student as online
+    await query('UPDATE exam_sessions SET last_seen = now() WHERE id = $1', [s.id]);
+
     res.json(out);
   } catch (err) {
     console.error('GET /state error:', err);

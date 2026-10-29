@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_BASE } from '../lib/supabase.js';
+import Loading from '../components/Loading.jsx';
 
 export default function StudentDashboard() {
   const [state, setState] = useState(null);
@@ -58,6 +59,8 @@ export default function StudentDashboard() {
 
   return (
     <div style={style.page}>
+      {loading && <Loading />}
+      {!loading && (
       <nav style={style.nav}>
         <b>Exam Portal</b>
         <span style={style.spacer}></span>
@@ -127,6 +130,7 @@ export default function StudentDashboard() {
       </div>
 
       {error && <div style={style.alert}>{error}</div>}
+      )}
     </div>
   );
 }

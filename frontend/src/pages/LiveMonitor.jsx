@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost } from '../lib/api.js';
+import Loading from '../components/Loading.jsx';
 
 export default function LiveMonitor() {
   const { examId } = useParams();
@@ -50,7 +51,7 @@ export default function LiveMonitor() {
     return `${m}:${s}`;
   };
 
-  if (!exam) return <p>Loading exam…</p>;
+  if (!exam) return <Loading />;
 
   return (
     <div style={style.page}>

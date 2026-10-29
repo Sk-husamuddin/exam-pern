@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost, apiDelete, apiFormPost } from '../lib/api.js';
+import Loading from '../components/Loading.jsx';
 
 export default function StudentsManager() {
   const [students, setStudents] = useState([]);
@@ -100,6 +101,8 @@ export default function StudentsManager() {
 
   return (
     <div style={style.page}>
+      {loading && <Loading />}
+      {!loading && (
       <nav style={style.nav}>
         <span>Students</span>
         <span style={style.spacer}></span>
@@ -211,6 +214,7 @@ export default function StudentsManager() {
           )}
         </tbody>
       </table>
+      )}
     </div>
   );
 }

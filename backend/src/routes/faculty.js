@@ -709,7 +709,7 @@ router.get('/state', verifyFaculty, async (req, res) => {
     const totalQ = await query('SELECT COUNT(*) FROM questions WHERE exam_id = $1', [exam_id]);
     const total = parseInt(totalQ.rows[0].count, 10);
 
-    const ONLINE_SEC = 11; // (3+3)*2+5 from original
+    const ONLINE_SEC = 20; // (3+3)*2+5 from original, increased for more lenient online detection
     const rows = await query(
       `SELECT s.id AS sid, p.username, p.name, s.login_order, s.login_time, s.violations, s.locked,
               q.q_no AS position,

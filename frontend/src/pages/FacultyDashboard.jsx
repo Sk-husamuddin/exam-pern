@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost, apiDelete } from '../lib/api.js';
+import Loading from '../components/Loading.jsx';
 import { Link } from 'react-router-dom';
 
 export default function FacultyDashboard() {
@@ -100,6 +101,8 @@ export default function FacultyDashboard() {
 
   return (
     <div style={style.page}>
+      {loading && <Loading />}
+      {!loading && (
       <nav style={style.nav}>
         <b>Exam Portal</b>
         <span style={style.spacer}></span>
@@ -273,6 +276,7 @@ export default function FacultyDashboard() {
             <div style={style.alertErr}>This exam is {selected.status}, so its settings and questions are locked.</div>
           )}
         </div>
+      )}
       )}
     </div>
   );
