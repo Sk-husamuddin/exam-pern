@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase.js';
-import { API_BASE, AUTH_BASE } from '../lib/supabase.js';
+import { apiGet, apiPost, apiDelete } from '../lib/api.js';
 import { Link } from 'react-router-dom';
 
 export default function FacultyDashboard() {
@@ -20,12 +20,8 @@ export default function FacultyDashboard() {
 
   async function fetchExams() {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const token = session?.session?.access_token;
-      const res = await fetch(`${API_BASE}/faculty/exams`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const json = await res.json();
+      setLoading(true);
+      const json = await apiGet('/faculty/exams');
       setExams(json.exams || []);
     } catch (err) {
       setError('Failed to load exams');
@@ -36,78 +32,67 @@ export default function FacultyDashboard() {
 
   async function createExam(e) {
     e.preventDefault();
-    const { data: session } = await supabase.auth.getSession();
-    const token = session?.session?.access_token;
-    const res = await fetch(`${API_BASE}/faculty/exams`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-      body: JSON.stringify({
+    try {
+      const json = await apiPost('/faculty/exams', {
         title: form.title,
         duration: form.duration,
         max_violations: form.max_violations,
-      }),
-    });
-    const json = await res.json();
-    if (json.ok) {
-      setFlash({ type: 'ok', msg: json.message });
-      setShowCreate(false);
-      setForm({ title: '', duration: 60, max_violations: 3 });
-      fetchExams();
-    } else {
-      setFlash({ type: 'err', msg: json.error });
+      });
+      if (json.ok) {
+        setFlash({ type: 'ok', msg: json.message });
+        setShowCreate(false);
+        setForm({ title: '', duration: 60, max_violations: 3 });
+        fetchExams();
+      } else {
+        setFlash({ type: 'err', msg: json.error });
+      }
+    } catch (err) {
+      setFlash({ type: 'err', msg: err.message || 'Create failed' });
     }
   }
 
   async function startExam(id) {
-    const { data: session } = await supabase.auth.getSession();
-    const token = session?.session?.access_token;
-    const res = await fetch(`${API_BASE}/faculty/exams/${id}/start`, {
-      method: 'POST',
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    });
-    const json = await res.json();
-    if (json.ok) {
-      fetchExams();
-    } else {
-      alert(json.error || 'Failed to start exam');
+    try {
+      const json = await apiPost(`/faculty/exams/${id}/start`);
+      if (json.ok) {
+        fetchExams();
+      } else {
+        alert(json.error || 'Failed to start exam');
+      }
+    } catch (err) {
+      alert(err.message || 'Start failed');
     }
   }
 
   async function endExam(id) {
     if (!confirm('End the exam for everyone?')) return;
-    const { data: session } = await supabase.auth.getSession();
-    const token = session?.session?.access_token;
-    await fetch(`${API_BASE}/faculty/exams/${id}/end`, {
-      method: 'POST',
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    });
-    fetchExams();
+    try {
+      await apiPost(`/faculty/exams/${id}/end`);
+      fetchExams();
+    } catch (err) {
+      alert(err.message || 'End failed');
+    }
   }
 
   async function deleteExam(id) {
     if (!confirm('Delete this exam and all its records?')) return;
-    const { data: session } = await supabase.auth.getSession();
-    const token = session?.session?.access_token;
-    await fetch(`${API_BASE}/faculty/exams/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    });
-    fetchExams();
+    try {
+      await apiDelete(`/faculty/exams/${id}`);
+      fetchExams();
+    } catch (err) {
+      alert(err.message || 'Delete failed');
+    }
   }
 
   async function loadExamDetail(id) {
-    const { data: session } = await supabase.auth.getSession();
-    const token = session?.session?.access_token;
-    const res = await fetch(`${API_BASE}/faculty/exams/${id}`, {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    });
-    const json = await res.json();
-    setSelected(json.exam);
-    setQuestions(json.exam.questions || []);
-    setSelStudents(json.exam.sc || 0);
+    try {
+      const json = await apiGet(`/faculty/exams/${id}`);
+      setSelected(json.exam);
+      setQuestions(json.exam.questions || []);
+      setSelStudents(json.exam.sc || 0);
+    } catch (err) {
+      setError('Failed to load exam detail');
+    }
   }
 
   const totalExams = exams.length;

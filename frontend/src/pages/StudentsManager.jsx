@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase.js';
-import { API_BASE } from '../lib/supabase.js';
+import { apiGet, apiPost, apiDelete, apiFormPost } from '../lib/api.js';
 
 export default function StudentsManager() {
   const [students, setStudents] = useState([]);
@@ -19,19 +19,13 @@ export default function StudentsManager() {
     loadStudents();
   }, [search]);
 
-  async function authHeaders() {
-    const { data: session } = await supabase.auth.getSession();
-    const token = session?.session?.access_token;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
   async function loadStudents() {
     try {
-      const url = new URL(`${API_BASE}/faculty/students`);
+      const url = new URL('/faculty/students', window.location.origin);
       if (search) url.searchParams.set('q', search);
-      const res = await fetch(url, { headers: await authHeaders() });
-      const json = await res.json();
+      const json = await apiGet(url.pathname + url.search);
       setStudents(json.students || []);
+      setTotal(json.students ? json.students.length : 0);
     } catch (err) {
       setError('Failed to load students');
     } finally {
@@ -42,19 +36,21 @@ export default function StudentsManager() {
   async function addStudent(e) {
     e.preventDefault();
     if (!username.trim()) return;
-    const res = await fetch(`${API_BASE}/faculty/students`, {
-      method: 'POST',
-      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.trim(), name: name.trim() }),
-    });
-    const json = await res.json();
-    if (json.ok) {
-      setUsername('');
-      setName('');
-      setFlash({ type: 'ok', msg: json.message });
-      loadStudents();
-    } else {
-      setFlash({ type: 'err', msg: json.error });
+    try {
+      const json = await apiPost('/faculty/students', {
+        username: username.trim(),
+        name: name.trim(),
+      });
+      if (json.ok) {
+        setUsername('');
+        setName('');
+        setFlash({ type: 'ok', msg: json.message });
+        loadStudents();
+      } else {
+        setFlash({ type: 'err', msg: json.error });
+      }
+    } catch (err) {
+      setFlash({ type: 'err', msg: err.message || 'Create failed' });
     }
   }
 
@@ -63,46 +59,42 @@ export default function StudentsManager() {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${API_BASE}/faculty/students/import`, {
-      method: 'POST',
-      headers: await authHeaders(),
-      body: formData,
-    });
-    const json = await res.json();
-    if (json.ok) {
-      setFlash({ type: 'ok', msg: json.message });
-      loadStudents();
-    } else {
-      setFlash({ type: 'err', msg: json.error });
+    try {
+      const json = await apiFormPost('/faculty/students/import', formData);
+      if (json.ok) {
+        setFlash({ type: 'ok', msg: json.message });
+        loadStudents();
+      } else {
+        setFlash({ type: 'err', msg: json.error });
+      }
+    } catch (err) {
+      setFlash({ type: 'err', msg: err.message || 'Import failed' });
     }
   }
 
   async function resetPassword(id, uname) {
     if (!confirm(`Reset the password of ${uname} to the username?`)) return;
-    const res = await fetch(`${API_BASE}/faculty/students/${id}/reset`, {
-      method: 'POST',
-      headers: await authHeaders(),
-    });
-    const json = await res.json();
-    if (json.ok) {
-      setFlash({ type: 'ok', msg: json.message });
-      loadStudents();
-    } else {
-      setFlash({ type: 'err', msg: json.error });
+    try {
+      const json = await apiPost(`/faculty/students/${id}/reset`);
+      if (json.ok) {
+        setFlash({ type: 'ok', msg: json.message });
+        loadStudents();
+      } else {
+        setFlash({ type: 'err', msg: json.error });
+      }
+    } catch (err) {
+      setFlash({ type: 'err', msg: err.message || 'Reset failed' });
     }
   }
 
   async function deleteStudent(id, uname) {
     if (!confirm(`Delete student ${uname} and their records?`)) return;
-    const res = await fetch(`${API_BASE}/faculty/students/${id}`, {
-      method: 'DELETE',
-      headers: await authHeaders(),
-    });
-    if (res.ok) {
+    try {
+      await apiDelete(`/faculty/students/${id}`);
       setFlash({ type: 'ok', msg: 'Student deleted' });
       loadStudents();
-    } else {
-      setFlash({ type: 'err', msg: 'Failed to delete' });
+    } catch (err) {
+      setFlash({ type: 'err', msg: err.message || 'Delete failed' });
     }
   }
 

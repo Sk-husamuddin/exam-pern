@@ -19,19 +19,16 @@ export default function FacultyLogin() {
         password,
       });
       if (err) throw err;
-      if (data.user) {
-        // Notify backend to create profiles row
-        await fetch('/auth/faculty/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            auth_user_id: data.user.id,
-            username: email.split('@')[0],
-            name: email.split('@')[0],
-          }),
-        });
+      if (data.user && !data.session) {
+        // Email confirmation enabled — user must confirm before signing in
+        setError('Account created. Please check your email to confirm, then sign in.');
+        return;
       }
-      setError('Faculty account created. Please log in.');
+      if (data.session) {
+        navigate('/faculty/dashboard');
+      } else {
+        setError('Account created. Please sign in.');
+      }
     } catch (err) {
       setError(err.message || 'Signup failed');
     } finally {
@@ -49,7 +46,11 @@ export default function FacultyLogin() {
         password,
       });
       if (err) throw err;
-      navigate('/faculty/dashboard');
+      if (data.session) {
+        navigate('/faculty/dashboard');
+      } else {
+        setError('Sign in failed. Please try again.');
+      }
     } catch (err) {
       setError(err.message || 'Login failed');
     } finally {

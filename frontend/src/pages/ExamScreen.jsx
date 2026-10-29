@@ -4,6 +4,8 @@ import { API_BASE } from '../lib/supabase.js';
 export default function ExamScreen() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [backendDown, setBackendDown] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [armed, setArmed] = useState(false);
   const [lastV, setLastV] = useState(0);
   const [deadline, setDeadline] = useState(0);
@@ -18,6 +20,20 @@ export default function ExamScreen() {
   async function authHeaders() {
     const token = localStorage.getItem('exam_student_token');
     return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function checkBackendHealth() {
+    try {
+      await fetch(`${API_BASE.replace('/api', '')}/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000),
+      });
+      setBackendDown(false);
+      return true;
+    } catch (_) {
+      setBackendDown(true);
+      return false;
+    }
   }
 
   async function getJson(url, options = {}) {
@@ -66,6 +82,7 @@ export default function ExamScreen() {
     if (!d || typeof d !== 'object') throw new Error('Invalid server response');
     lastDataRef.current = d;
     setData(d);
+    setBackendDown(false);
 
     if (d.status === 'kicked') {
       showMessage('Session expired', 'This student session is no longer active. Please sign in again.', '/student/login', 'Login');
@@ -116,6 +133,21 @@ export default function ExamScreen() {
     if (polling) return;
     setPolling(true);
     try {
+      // Check backend health first
+      const healthy = await checkBackendHealth();
+      if (!healthy) {
+        setBackendDown(true);
+        const warn = document.getElementById('warn');
+        if (warn) {
+          warn.textContent = 'Connection problem: Backend server is not reachable. Please start the backend on port 5000.';
+          warn.style.display = 'block';
+        }
+        setPolling(false);
+        setTimeout(poll, POLL_MS);
+        return;
+      }
+      setBackendDown(false);
+
       const d = await getJson(`${API_BASE}/student/state`, { cache: 'no-store', headers: await authHeaders() });
       render(d);
     } catch (e) {
@@ -125,6 +157,7 @@ export default function ExamScreen() {
         warn.style.display = 'block';
       }
     } finally {
+      setLoading(false);
       setPolling(false);
       setTimeout(poll, POLL_MS);
     }
@@ -266,6 +299,17 @@ export default function ExamScreen() {
           <span id="viol"></span> <span id="timer" className="timer" style={style.timer}></span>
         </div>
       </header>
+      {backendDown && (
+        <div style={style.alertErr}>
+          <b>Backend not reachable:</b> The exam server on port 5000 is not running. Please start the backend and refresh this page.
+        </div>
+      )}
+      {loading && (
+        <div style={style.loading}>
+          <div style={style.spinner}></div>
+          <p style={style.loadingText}>Connecting to exam server…</p>
+        </div>
+      )}
       <div id="warn" className="alert" style={{ ...style.alert, display: 'none' }}></div>
       <main id="main" style={style.main}>
         <p className="muted" style={style.muted}>
@@ -330,4 +374,18 @@ const style = {
     background: '#fde8e8', color: '#9b1c1c', padding: '10px 14px',
     borderRadius: 6, margin: '10px 0',
   },
+  alertErr: {
+    background: '#fde8e8', color: '#9b1c1c', padding: '10px 14px',
+    borderRadius: 6, margin: '10px 0',
+  },
+  loading: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', height: '60vh', gap: 12,
+  },
+  spinner: {
+    width: 40, height: 40, border: '4px solid #e5e7eb',
+    borderTop: '4px solid #2b5cff', borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  loadingText: { color: '#6b7280', fontSize: 16 },
 };

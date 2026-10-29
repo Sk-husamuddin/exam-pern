@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
-import { API_BASE } from '../lib/supabase.js';
+import { apiGet, apiPost, apiPut, apiDelete, apiFormPost } from '../lib/api.js';
 
 export default function QuestionsEditor() {
   const { examId } = useParams();
@@ -24,16 +24,9 @@ export default function QuestionsEditor() {
     loadExam();
   }, [examId]);
 
-  async function authHeaders() {
-    const { data: session } = await supabase.auth.getSession();
-    const token = session?.session?.access_token;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
   async function loadExam() {
     try {
-      const res = await fetch(`${API_BASE}/faculty/exams/${examId}`, { headers: await authHeaders() });
-      const json = await res.json();
+      const json = await apiGet(`/faculty/exams/${examId}`);
       setExam(json.exam);
       setQuestions(json.exam.questions || []);
       setDraft(json.exam.status === 'draft');
@@ -45,39 +38,40 @@ export default function QuestionsEditor() {
   async function addQuestion(e) {
     e.preventDefault();
     if (!manualBody.trim()) return;
-    const res = await fetch(`${API_BASE}/faculty/questions`, {
-      method: 'POST',
-      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exam_id: examId, body: manualBody.trim() }),
-    });
-    const json = await res.json();
-    if (json.ok) {
-      setManualBody('');
-      loadExam();
-    } else {
-      setFlash({ type: 'err', msg: json.error });
+    try {
+      const json = await apiPost('/faculty/questions', {
+        exam_id: examId,
+        body: manualBody.trim(),
+      });
+      if (json.ok) {
+        setManualBody('');
+        loadExam();
+      } else {
+        setFlash({ type: 'err', msg: json.error });
+      }
+    } catch (err) {
+      setFlash({ type: 'err', msg: err.message || 'Add failed' });
     }
   }
 
   async function updateQuestion(qId, body) {
-    const res = await fetch(`${API_BASE}/faculty/questions/${qId}`, {
-      method: 'PUT',
-      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body }),
-    });
-    const json = await res.json();
-    if (json.ok) loadExam();
-    else alert(json.error);
+    try {
+      const json = await apiPut(`/faculty/questions/${qId}`, { body });
+      if (json.ok) loadExam();
+      else alert(json.error);
+    } catch (err) {
+      alert(err.message || 'Update failed');
+    }
   }
 
   async function deleteQuestion(qId) {
     if (!confirm('Delete this question?')) return;
-    const res = await fetch(`${API_BASE}/faculty/questions/${qId}`, {
-      method: 'DELETE',
-      headers: await authHeaders(),
-    });
-    if (res.ok) loadExam();
-    else alert('Failed to delete');
+    try {
+      await apiDelete(`/faculty/questions/${qId}`);
+      loadExam();
+    } catch (err) {
+      alert('Failed to delete');
+    }
   }
 
   // ---------- Word import ----------
@@ -94,12 +88,7 @@ export default function QuestionsEditor() {
     formData.append('mode', mode);
 
     try {
-      const res = await fetch(`${API_BASE}/faculty/questions/import-docx`, {
-        method: 'POST',
-        headers: await authHeaders(),
-        body: formData,
-      });
-      const json = await res.json();
+      const json = await apiFormPost('/faculty/questions/import-docx', formData);
       if (json.ok) {
         setPreview({ items: json.items || [], ignored: json.ignored || 0, mode: json.mode, file: file.name, note: json.note });
       } else {
@@ -119,18 +108,20 @@ export default function QuestionsEditor() {
       keep: true,
       body: t,
     }));
-    const res = await fetch(`${API_BASE}/faculty/questions/import-docx/confirm`, {
-      method: 'POST',
-      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exam_id: examId, questions: items }),
-    });
-    const json = await res.json();
-    if (json.ok) {
-      setPreview(null);
-      setFlash({ type: 'ok', msg: json.message });
-      loadExam();
-    } else {
-      setFlash({ type: 'err', msg: json.error });
+    try {
+      const json = await apiPost('/faculty/questions/import-docx/confirm', {
+        exam_id: examId,
+        questions: items,
+      });
+      if (json.ok) {
+        setPreview(null);
+        setFlash({ type: 'ok', msg: json.message });
+        loadExam();
+      } else {
+        setFlash({ type: 'err', msg: json.error });
+      }
+    } catch (err) {
+      setFlash({ type: 'err', msg: err.message || 'Confirm failed' });
     }
   }
 

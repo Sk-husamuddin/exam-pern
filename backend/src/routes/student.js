@@ -53,7 +53,7 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
     await query('BEGIN');
     try {
       // Lock exam row to prevent concurrent start/end changes
-      const examRows = await query('SELECT * FROM exams WHERE code = $1 AND status <> $2 FOR UPDATE', ['ended', 'ended']);
+      const examRows = await query('SELECT * FROM exams WHERE code = $1 AND status <> $2 FOR UPDATE', [code, 'ended']);
       if (examRows.rows.length === 0) {
         await query('ROLLBACK');
         return res.status(400).json({ error: 'Invalid exam code, or the exam has ended' });
@@ -213,12 +213,12 @@ router.post('/violation', verifyStudentSession, async (req, res) => {
       await query('BEGIN');
       try {
         const latest = await query(
-          'SELECT violations, locked, max_violations FROM exam_sessions WHERE id = $1 FOR UPDATE',
+          'SELECT violations, locked FROM exam_sessions WHERE id = $1 FOR UPDATE',
           [s.id]
         );
         const cur = latest.rows[0];
         const newViolations = parseInt(cur.violations, 10) + 1;
-        const newLocked = newViolations >= parseInt(cur.max_violations, 10) ? 1 : cur.locked;
+        const newLocked = newViolations >= parseInt(s.max_violations, 10) ? 1 : cur.locked;
 
         await query(
           'UPDATE exam_sessions SET violations = $1, locked = $2 WHERE id = $3',
@@ -234,8 +234,8 @@ router.post('/violation', verifyStudentSession, async (req, res) => {
 
     // Return updated state
     const updated = await query(
-      `SELECT s.status, s.locked, s.violations, s.max_violations,
-              e.title, e.duration_min,
+      `SELECT s.locked, s.violations,
+              e.status, e.title, e.duration_min, e.max_violations,
               EXTRACT(EPOCH FROM (e.started_at AT TIME ZONE 'UTC')) as started_at_epoch
        FROM exam_sessions s JOIN exams e ON e.id = s.exam_id
        WHERE s.id = $1`,

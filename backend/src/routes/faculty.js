@@ -237,17 +237,18 @@ router.post('/questions/import-docx', verifyFaculty, uploadDocx.single('file'), 
     }
 
     const mode = (req.body.mode || 'auto').toString();
-    const { JSZip } = require('jszip');
-    const zip = new JSZip();
-    const zipData = await zip.loadAsync(req.file.buffer);
-
-    // Extract shared strings
-    const shared = [];
-    const ssFile = zip.file('word/document.xml');
-    if (!ssFile) {
-      return res.status(400).json({ error: 'Could not read this file. Make sure it is a valid .docx document.' });
+    const JSZip = require('jszip');
+    let zip;
+    try {
+      zip = await JSZip.loadAsync(req.file.buffer);
+    } catch (e) {
+      return res.status(400).json({ error: 'Not a valid .docx file' });
     }
-    const xml = await ssFile.async('string');
+    const docXml = zip.file('word/document.xml');
+    if (!docXml) {
+      return res.status(400).json({ error: 'Not a valid .docx file' });
+    }
+    const xml = await docXml.async('string');
 
     // Simple paragraph extraction via regex (parity with original PHP logic)
     const paras = [];
@@ -665,10 +666,9 @@ router.post('/action', verifyFaculty, async (req, res) => {
       );
     } else if (action === 'lock' || action === 'unlock') {
       if (!sid) return res.status(400).json({ error: 'sid is required' });
-      const lock = action === 'lock' ? 1 : 0;
+      const lock = action === 'lock';
       await query(
-        `UPDATE exam_sessions SET locked = $1, violations = CASE WHEN $1 = 0 THEN violations ELSE violations END
-         WHERE id = $2 AND exam_id = $3`,
+        `UPDATE exam_sessions SET locked = $1 WHERE id = $2 AND exam_id = $3`,
         [lock, sid, exam_id]
       );
     } else {
@@ -758,9 +758,7 @@ function parseXlsx(buffer) {
   const zip = new JSZip();
   const shared = [];
 
-  try {
-    const zipData = zip.loadAsync(buffer);
-    return zipData.then((z) => {
+  return zip.loadAsync(buffer).then((z) => {
       return z.file('xl/sharedStrings.xml')?.async('string').then((ss) => {
         // Simple shared string extraction
         const siRegex = /<si[^>]*>([\s\S]*?)<\/si>/g;
@@ -799,10 +797,9 @@ function parseXlsx(buffer) {
         }
         return rows;
       });
+    }).catch((err) => {
+      return Promise.resolve([]);
     });
-  } catch (err) {
-    return Promise.resolve([]);
-  }
 }
 
 function parseCsv(buffer) {

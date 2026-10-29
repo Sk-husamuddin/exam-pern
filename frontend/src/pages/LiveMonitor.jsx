@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { API_BASE } from '../lib/supabase.js';
+import { supabase } from '../lib/supabase.js';
+import { apiGet, apiPost } from '../lib/api.js';
 
 export default function LiveMonitor() {
   const { examId } = useParams();
@@ -11,27 +12,14 @@ export default function LiveMonitor() {
 
   const POLL_MS = 3000;
 
-  async function authHeaders() {
-    const { data: session } = await supabase.auth.getSession();
-    const token = session?.session?.access_token;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
   async function poll() {
     try {
-      const res = await fetch(`${API_BASE}/faculty/state?exam_id=${examId}`, {
-        headers: await authHeaders(),
-      });
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) throw new Error('Session expired');
-        throw new Error('Poll failed');
-      }
-      const json = await res.json();
+      const json = await apiGet(`/faculty/state?exam_id=${examId}`);
       setExam(json.exam);
       setStudents(json.students || []);
       setError('');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Poll failed');
     } finally {
       setLoading(false);
     }
@@ -46,14 +34,13 @@ export default function LiveMonitor() {
   async function act(action, sid) {
     if (action === 'end' && !confirm('End the exam for everyone?')) return;
 
-    const res = await fetch(`${API_BASE}/faculty/action`, {
-      method: 'POST',
-      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exam_id: examId, action, sid }),
-    });
-    const json = await res.json();
-    if (json.error) alert(json.error);
-    poll();
+    try {
+      const json = await apiPost('/faculty/action', { exam_id: examId, action, sid });
+      if (json.error) alert(json.error);
+      poll();
+    } catch (err) {
+      alert(err.message || 'Action failed');
+    }
   }
 
   const fmt = (sec) => {
@@ -151,8 +138,6 @@ export default function LiveMonitor() {
     </div>
   );
 }
-
-import { supabase } from '../lib/supabase.js';
 
 const style = {
   page: { fontFamily: 'system-ui, sans-serif', maxWidth: 1100, margin: '0 auto', padding: 16 },

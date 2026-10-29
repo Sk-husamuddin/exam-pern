@@ -3,30 +3,52 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../db');
 const config = require('../config');
+const { verifyFaculty } = require('../middleware/auth');
 
 const router = express.Router();
 
 // ------------------------------------------------------------------
-// Faculty signup via Supabase Auth is handled on the frontend.
-// This route creates the matching profiles row after Supabase signup.
+// Faculty profile: create/update the calling faculty user's own profile.
+// Requires a valid Supabase faculty Bearer token. Never trusts body auth_user_id.
 // ------------------------------------------------------------------
-router.post('/faculty/profile', async (req, res) => {
+router.post('/faculty/profile', verifyFaculty, async (req, res) => {
   try {
-    const { auth_user_id, username, name } = req.body;
-    if (!auth_user_id || !username || !name) {
-      return res.status(400).json({ error: 'auth_user_id, username and name are required' });
+    const { username, name } = req.body;
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ error: 'Username is required' });
     }
+    const authUserId = req.faculty.id;
+    const displayName = (name || '').trim() || username.trim();
 
     const { rows } = await query(
       `INSERT INTO profiles (auth_user_id, username, name, role)
        VALUES ($1, $2, $3, 'faculty')
-       ON CONFLICT (username) DO UPDATE SET name = $3, auth_user_id = $1
+       ON CONFLICT (username) DO UPDATE SET name = EXCLUDED.name, auth_user_id = EXCLUDED.auth_user_id
+       WHERE profiles.id = EXCLUDED.id
        RETURNING id, username, name, role`,
-      [auth_user_id, username, name]
+      [authUserId, username.trim(), displayName]
     );
+    if (rows.length === 0) {
+      // Username taken by a different user; try with suffix
+      let suffix = 1;
+      let tryUsername = `${username.trim()}${suffix}`;
+      while (true) {
+        const { rows: dup } = await query('SELECT 1 FROM profiles WHERE username = $1 AND id <> $2', [tryUsername, authUserId]);
+        if (dup.length === 0) break;
+        suffix++;
+        tryUsername = `${username.trim()}${suffix}`;
+      }
+      const { rows: rows2 } = await query(
+        `INSERT INTO profiles (auth_user_id, username, name, role)
+         VALUES ($1, $2, $3, 'faculty')
+         RETURNING id, username, name, role`,
+        [authUserId, tryUsername, displayName]
+      );
+      return res.json({ ok: true, profile: rows2[0], username: tryUsername });
+    }
     res.json({ ok: true, profile: rows[0] });
   } catch (err) {
-    console.error('faculty/profile error:', err);
+    console.error('faculty/profile error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -58,7 +80,6 @@ router.post('/student/login', async (req, res) => {
     }
 
     // Single-session token (replaces PHP session token)
-    const token = require('crypto').randomBytes(16).toString('hex');
 
     // Insert or reuse session
     let session;
@@ -75,10 +96,21 @@ router.post('/student/login', async (req, res) => {
       { expiresIn: '12h' }
     );
 
+    // Kick-out: rotate token for all existing exam sessions so the old
+    // browser is invalidated (same as PHP login.php behavior).
+    const token = require('crypto').randomBytes(16).toString('hex');
+    const sessions = await query(
+      'SELECT id FROM exam_sessions WHERE user_id = $1',
+      [user.id]
+    );
+    for (const s of sessions.rows) {
+      await query('UPDATE exam_sessions SET token = $1, last_seen = now() WHERE id = $2', [token, s.id]);
+    }
+
     res.json({
       ok: true,
-      token, // exam session token (sent with exam_code on /api/student/enter)
-      studentJwt, // JWT for authenticated student routes
+      token,
+      studentJwt,
       user: { id: user.id, username: user.username, name: user.name, role: user.role },
     });
   } catch (err) {
