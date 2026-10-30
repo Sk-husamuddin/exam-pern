@@ -109,9 +109,10 @@ export default function QuestionsEditor() {
   async function confirmImport(e) {
     e.preventDefault();
     if (!preview) return;
-    const items = preview.items.map((t, i) => ({
-      keep: true,
-      body: t,
+    const form = e.target;
+    const items = preview.items.map((_, i) => ({
+      keep: form.elements[`q[${i}][keep]`]?.checked ?? true,
+      body: form.elements[`q[${i}][body]`]?.value ?? '',
     }));
     try {
       const json = await apiPost('/faculty/questions/import-docx/confirm', {
@@ -251,47 +252,47 @@ export default function QuestionsEditor() {
                     </form>
                   </div>
                 )}
-
-                <h3 id="list" style={style.h3}>Questions in this exam ({questions.length})</h3>
-                {questions.map((q) => (
-                  <div key={q.id} style={style.cardItem}>
-                    <div style={style.qheadItem}>
-                      <b>Question {q.q_no}</b>
-                    </div>
-                    {draft ? (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          const body = e.target.elements.body.value;
-                          updateQuestion(q.id, body);
-                        }}
-                        style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
-                      >
-                        <textarea
-                          style={style.textarea}
-                          name="body"
-                          defaultValue={q.body}
-                          required
-                        />
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button type="submit" style={style.btnSm}>Save changes</button>
-                          <button
-                            type="button"
-                            onClick={() => deleteQuestion(q.id)}
-                            style={style.btnSmRed}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      <div style={style.questionBody}>{q.body}</div>
-                    )}
-                  </div>
-                ))}
-                {questions.length === 0 && <p style={style.muted}>No questions yet.</p>}
               </>
             )}
+
+            <h3 id="list" style={style.h3}>Questions in this exam ({questions.length})</h3>
+            {questions.map((q) => (
+              <div key={q.id} style={style.cardItem}>
+                <div style={style.qheadItem}>
+                  <b>Question {q.q_no}</b>
+                </div>
+                {draft ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const body = e.target.elements.body.value;
+                      updateQuestion(q.id, body);
+                    }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+                  >
+                    <textarea
+                      style={style.textarea}
+                      name="body"
+                      defaultValue={q.body}
+                      required
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="submit" style={style.btnSm}>Save changes</button>
+                      <button
+                        type="button"
+                        onClick={() => deleteQuestion(q.id)}
+                        style={style.btnSmRed}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div style={style.questionBody}>{q.body}</div>
+                )}
+              </div>
+            ))}
+            {questions.length === 0 && <p style={style.muted}>No questions yet.</p>}
           </>
         )}
         </>

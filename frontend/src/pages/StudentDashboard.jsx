@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { API_BASE } from '../lib/supabase.js';
 import Loading from '../components/Loading.jsx';
 
@@ -40,6 +41,17 @@ export default function StudentDashboard() {
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    if (!state || state.status !== 'live' || state.seconds_left == null || state.seconds_left <= 0) return;
+    const tick = setInterval(() => {
+      setState((prev) => {
+        if (!prev || prev.seconds_left == null || prev.seconds_left <= 0) return prev;
+        return { ...prev, seconds_left: Math.max(0, prev.seconds_left - 1) };
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [state?.status]);
+
   const fmt = (sec) => {
     if (sec == null) return '-';
     const m = Math.floor(sec / 60);
@@ -71,6 +83,7 @@ export default function StudentDashboard() {
               localStorage.removeItem('exam_student_token');
               localStorage.removeItem('exam_student_jwt');
               localStorage.removeItem('exam_student_user');
+              localStorage.removeItem('exam_student_code');
               window.location.href = '/student/login';
             }}
             style={style.btnDanger}
@@ -109,9 +122,15 @@ export default function StudentDashboard() {
                   ? 'Your exam is locked.'
                   : 'One question from this exam&rsquo;s faculty-created question list is assigned when you enter.'}
               </p>
-              <a href="/student/exam" style={style.btnLink(btnOn)}>
-                {btnText()}
-              </a>
+              {btnOn ? (
+                <Link to="/student/exam" style={style.btnLink(true)}>
+                  {btnText()}
+                </Link>
+              ) : (
+                <span style={style.btnLink(false)}>
+                  {btnText()}
+                </span>
+              )}
             </>
           )}
           {!state && <p>Loading…</p>}

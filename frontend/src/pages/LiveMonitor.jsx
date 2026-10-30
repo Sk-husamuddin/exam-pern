@@ -16,7 +16,7 @@ export default function LiveMonitor() {
   async function poll() {
     try {
       const json = await apiGet(`/faculty/state?exam_id=${examId}`);
-      setExam(json.exam);
+      setExam((prev) => ({ ...(prev || {}), ...json.exam }));
       setStudents(json.students || []);
       setError('');
     } catch (err) {
@@ -27,10 +27,36 @@ export default function LiveMonitor() {
   }
 
   useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const detail = await apiGet(`/faculty/exams/${examId}`);
+        if (mounted && detail?.exam) {
+          setExam((prev) => ({ ...detail.exam, ...(prev || {}) }));
+        }
+      } catch (err) {
+        if (mounted) setError(err.message || 'Failed to load exam details');
+      }
+    })();
+
     poll();
     const id = setInterval(poll, POLL_MS);
-    return () => clearInterval(id);
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
   }, [examId]);
+
+  useEffect(() => {
+    if (!exam || exam.status !== 'live' || exam.seconds_left == null || exam.seconds_left <= 0) return;
+    const tick = setInterval(() => {
+      setExam((prev) => {
+        if (!prev || prev.seconds_left == null || prev.seconds_left <= 0) return prev;
+        return { ...prev, seconds_left: Math.max(0, prev.seconds_left - 1) };
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [exam?.status]);
 
   async function act(action, sid) {
     if (action === 'end' && !confirm('End the exam for everyone?')) return;
@@ -46,12 +72,24 @@ export default function LiveMonitor() {
 
   const fmt = (sec) => {
     if (sec == null) return '-';
+    sec = Math.max(0, Number(sec) || 0);
     const m = Math.floor(sec / 60);
     const s = Math.floor(sec % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
   };
 
-  if (!exam) return <Loading />;
+  if (loading && !exam) return <Loading />;
+
+  if (!exam) {
+    return (
+      <div style={style.page}>
+        <nav style={style.nav}>
+          <Link to="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</Link>
+        </nav>
+        <div style={style.alertErr}>{error || 'Exam not found'}</div>
+      </div>
+    );
+  }
 
   return (
     <div style={style.page}>
@@ -87,15 +125,15 @@ export default function LiveMonitor() {
       <table style={style.table}>
         <thead>
           <tr>
-            <th>#</th>
-            <th>Student</th>
-            <th>Online</th>
-            <th>Login time</th>
-            <th>Question</th>
-            <th>Violations</th>
-            <th>Last reason</th>
-            <th>State</th>
-            <th></th>
+            <th style={style.th}>#</th>
+            <th style={style.th}>Student</th>
+            <th style={style.th}>Online</th>
+            <th style={style.th}>Login time</th>
+            <th style={style.th}>Question</th>
+            <th style={style.th}>Violations</th>
+            <th style={style.th}>Last reason</th>
+            <th style={style.th}>State</th>
+            <th style={style.th}></th>
           </tr>
         </thead>
         <tbody id="rows">
@@ -108,23 +146,23 @@ export default function LiveMonitor() {
           ) : (
             students.map((s) => (
               <tr key={s.sid}>
-                <td>{s.login_order}</td>
-                <td>
+                <td style={style.td}>{s.login_order}</td>
+                <td style={style.td}>
                   <div>{s.name}</div>
                   <small style={style.muted}>{s.username}</small>
                 </td>
-                <td>
+                <td style={style.td}>
                   <span
                     style={{ ...style.dot, ...(s.online ? style.dotOn : {}) }}
                   ></span>
                   {s.online ? 'online' : 'offline'}
                 </td>
-                <td>{s.login_time}</td>
-                <td>{s.position ? `Q${s.position}` : <span style={style.muted}>not entered</span>}</td>
-                <td>{s.violations}/{exam.max}</td>
-                <td style={style.muted}>{s.last_reason || '-'}</td>
-                <td>{s.locked ? <span style={style.badgeEnded}>locked</span> : 'ok'}</td>
-                <td>
+                <td style={style.td}>{s.login_time}</td>
+                <td style={style.td}>{s.position ? `Q${s.position}` : <span style={style.muted}>not entered</span>}</td>
+                <td style={style.td}>{s.violations}/{exam.max || 3}</td>
+                <td style={{ ...style.td, ...style.muted }}>{s.last_reason || '-'}</td>
+                <td style={style.td}>{s.locked ? <span style={style.badgeEnded}>locked</span> : 'ok'}</td>
+                <td style={style.td}>
                   {s.locked ? (
                     <button onClick={() => act('unlock', s.sid)} style={style.btnSm}>Unlock</button>
                   ) : (

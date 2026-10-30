@@ -129,19 +129,19 @@ export default function FacultyDashboard() {
           <div style={style.stat}>
             <small>Next step</small>
             <b>
-              <a href="/faculty/students" style={style.link}>
+              <Link to="/faculty/students" style={style.link}>
                 Add students
-              </a>
+              </Link>
             </b>
           </div>
         </div>
 
         <details
-          open={!totalExams}
+          open={showCreate || !totalExams}
           style={style.card}
           onToggle={(e) => setShowCreate(e.target.open)}
         >
-          <summary>+ Create new exam</summary>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>+ Create new exam</summary>
           <form onSubmit={createExam} style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <input
               style={style.input}
@@ -179,32 +179,37 @@ export default function FacultyDashboard() {
         <table style={style.table}>
           <thead>
             <tr>
-              <th>Exam</th>
-              <th>Code</th>
-              <th>Status</th>
-              <th>Questions</th>
-              <th>Students</th>
-              <th>Duration</th>
-              <th></th>
+              <th style={style.th}>Exam</th>
+              <th style={style.th}>Code</th>
+              <th style={style.th}>Status</th>
+              <th style={style.th}>Questions</th>
+              <th style={style.th}>Students</th>
+              <th style={style.th}>Duration</th>
+              <th style={style.th}></th>
             </tr>
           </thead>
           <tbody>
             {exams.map((e) => (
               <tr key={e.id} style={selected?.id === e.id ? style.selRow : {}}>
-                <td>
-                  <Link to={`/faculty/questions/${e.id}`} onClick={() => loadExamDetail(e.id)}>
+                <td style={style.td}>
+                  <button
+                    type="button"
+                    onClick={() => loadExamDetail(e.id)}
+                    style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#1d2433', fontSize: 14 }}
+                    title="Click to view details below"
+                  >
                     <b>{e.title}</b>
-                  </Link>
+                  </button>
                 </td>
-                <td><b>{e.code}</b></td>
-                <td>
+                <td style={style.td}><b>{e.code}</b></td>
+                <td style={style.td}>
                   <span style={style.badge(statusColor(e.status))}>{e.status}</span>
                 </td>
-                <td>{e.qc}</td>
-                <td>{e.sc}</td>
-                <td>{e.duration_min} min</td>
-                <td style={style.tdActions}>
-                  <Link to={`/faculty/questions/${e.id}`} onClick={() => loadExamDetail(e.id)}>
+                <td style={style.td}>{e.qc}</td>
+                <td style={style.td}>{e.sc}</td>
+                <td style={style.td}>{e.duration_min} min</td>
+                <td style={{ ...style.td, ...style.tdActions }}>
+                  <Link to={`/faculty/questions/${e.id}`}>
                     <button style={style.btnSm}>{e.status === 'draft' ? 'Manage questions' : 'View'}</button>
                   </Link>{' '}
                   <Link to={`/faculty/monitor/${e.id}`}>

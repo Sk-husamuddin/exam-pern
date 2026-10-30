@@ -4,31 +4,48 @@ import Loading from '../components/Loading.jsx';
 
 export default function ExamScreen() {
   const [data, setData] = useState(null);
-  const [error, setError] = useState('');
   const [backendDown, setBackendDown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [armed, setArmed] = useState(false);
-  const [lastV, setLastV] = useState(0);
-  const [deadline, setDeadline] = useState(0);
-  const [polling, setPolling] = useState(false);
   const [entered, setEntered] = useState(false);
+  const [deadline, setDeadline] = useState(0);
 
   const lastDataRef = useRef(null);
-  const csrfRef = useRef('');
+  const armedRef = useRef(false);
+  const lastVRef = useRef(0);
+  const dataRef = useRef(null);
+  const pollTimerRef = useRef(null);
 
   const POLL_MS = 3000;
 
-  async function authHeaders() {
+  useEffect(() => {
+    armedRef.current = armed;
+  }, [armed]);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  async function sessionAuthHeaders() {
     const token = localStorage.getItem('exam_student_token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function jwtAuthHeaders() {
+    const token = localStorage.getItem('exam_student_jwt');
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
   async function checkBackendHealth() {
     try {
-      await fetch(`${API_BASE.replace('/api', '')}/health`, {
+      const base = API_BASE.startsWith('http') ? API_BASE.replace(/\/api$/, '') : '';
+      const res = await fetch(`${base}/health`, {
         method: 'GET',
         signal: AbortSignal.timeout(3000),
       });
+      if (!res.ok) throw new Error('Health check failed');
+      const json = await res.json();
+      if (!json.ok) throw new Error('Service unhealthy');
       setBackendDown(false);
       return true;
     } catch (_) {
@@ -50,19 +67,27 @@ export default function ExamScreen() {
     } catch (_) {
       throw new Error('Server response was not JSON');
     }
-    if (!res.ok || d.error) throw new Error(d.error || `Request failed (${res.status})`);
+    if (res.status === 401 && d.status === 'kicked') {
+      return d;
+    }
+    if (!res.ok || d.error) {
+      throw new Error(d.error || `Request failed (${res.status})`);
+    }
     return d;
   }
 
   function fmt(sec) {
     sec = Math.max(0, Number(sec) || 0);
-    return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0').padStart(2, '0');
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   }
 
   function showMessage(title, text, href, linkText) {
     const main = document.getElementById('main');
     if (!main) return;
     main.innerHTML = '';
+    main.dataset.shown = '';
     const h = document.createElement('h2');
     h.textContent = title;
     const p = document.createElement('p');
@@ -75,138 +100,211 @@ export default function ExamScreen() {
       a.textContent = linkText || 'Back';
       a.style.display = 'inline-block';
       a.style.textDecoration = 'none';
+      a.style.background = '#2b5cff';
+      a.style.color = '#fff';
+      a.style.padding = '8px 16px';
+      a.style.borderRadius = '6px';
+      a.style.marginTop = '12px';
       main.append(a);
     }
   }
 
   function render(d) {
-    if (!d || typeof d !== 'object') throw new Error('Invalid server response');
+    if (!d || typeof d !== 'object') return;
     lastDataRef.current = d;
     setData(d);
     setBackendDown(false);
 
+    if (d.title) {
+      const titleEl = document.getElementById('examTitle');
+      if (titleEl) titleEl.textContent = d.title;
+    }
+
+    const violEl = document.getElementById('viol');
+    if (violEl && d.violations != null) {
+      violEl.textContent = `Violations: ${d.violations}/${d.max || 3}`;
+    }
+
+    if (d.seconds_left != null && d.status === 'live') {
+      setDeadline(Date.now() + d.seconds_left * 1000);
+    }
+
     if (d.status === 'kicked') {
-      showMessage('Session expired', 'This student session is no longer active. Please sign in again.', '/student/login', 'Login');
+      showMessage(
+        'Session expired',
+        'This student session is no longer active. Please sign in again.',
+        '/student/login',
+        'Login'
+      );
       setArmed(false);
       return;
     }
     if (d.status === 'ended') {
-      showMessage('Exam ended', 'Thank you. Your exam has ended.', '/student/dashboard', 'Back to dashboard');
+      showMessage(
+        'Exam ended',
+        'Thank you. Your exam has ended.',
+        '/student/dashboard',
+        'Back to dashboard'
+      );
       setArmed(false);
       return;
     }
     if (d.locked) {
-      showMessage('Exam locked', 'Your exam was locked because of too many violations. Please contact the faculty.');
+      showMessage(
+        'Exam locked',
+        'Your exam was locked because of too many violations. Please contact the faculty.'
+      );
       setArmed(false);
       return;
     }
 
-    const ready = !!d.entered && !!document.fullscreenElement;
-    document.getElementById('fsOverlay').style.display = ready ? 'none' : 'flex';
+    const isFullscreen = !!document.fullscreenElement;
+    const ready = !!d.entered && isFullscreen;
+    const fsOverlay = document.getElementById('fsOverlay');
+    if (fsOverlay) fsOverlay.style.display = ready ? 'none' : 'flex';
 
+    const main = document.getElementById('main');
     if (!ready) {
-      document.getElementById('main').innerHTML =
-        '<p class="muted">Exam is ready. Click “Enter fullscreen & show my question” to continue.</p>';
-      document.getElementById('main').dataset.shown = '';
+      if (main) {
+        main.innerHTML =
+          '<p class="muted">Exam is ready. Click “Enter fullscreen & show my question” to continue.</p>';
+        main.dataset.shown = '';
+      }
       return;
     }
 
     if (!d.question) {
-      showMessage('Question not available', 'No question has been assigned to this exam session. Please contact the faculty.');
+      showMessage(
+        'Question not available',
+        'No question has been assigned to this exam session. Please contact the faculty.'
+      );
       return;
     }
 
     const key = String(d.position || '') + '|' + String(d.question);
-    const main = document.getElementById('main');
-    if (main.dataset.shown !== key) {
+    if (main && main.dataset.shown !== key) {
       main.innerHTML = '';
       const h = document.createElement('h2');
       h.textContent = `Question ${d.position || ''}`;
       const q = document.createElement('div');
       q.className = 'question';
+      q.style.whiteSpace = 'pre-wrap';
+      q.style.fontSize = '18px';
+      q.style.lineHeight = '1.65';
+      q.style.background = '#fff';
+      q.style.padding = '24px';
+      q.style.borderRadius = '10px';
+      q.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)';
       q.textContent = d.question;
       main.append(h, q);
       main.dataset.shown = key;
     }
   }
 
-  async function poll() {
-    if (polling) return;
-    setPolling(true);
+  async function fetchState() {
     try {
-      // Check backend health first
       const healthy = await checkBackendHealth();
       if (!healthy) {
-        setBackendDown(true);
         const warn = document.getElementById('warn');
         if (warn) {
-          warn.textContent = 'Connection problem: Backend server is not reachable. Please start the backend on port 5000.';
+          warn.textContent = 'Connection problem: Backend server is not reachable on port 5000.';
           warn.style.display = 'block';
         }
-        setPolling(false);
-        setTimeout(poll, POLL_MS);
         return;
       }
       setBackendDown(false);
 
-      const d = await getJson(`${API_BASE}/student/state`, { cache: 'no-store', headers: await authHeaders() });
+      const d = await getJson(`${API_BASE}/student/state`, {
+        cache: 'no-store',
+        headers: await sessionAuthHeaders(),
+      });
       render(d);
     } catch (e) {
       const warn = document.getElementById('warn');
       if (warn) {
-        warn.textContent = 'Connection problem: ' + (e.message || 'Unable to contact the server.') + ' Retrying automatically…';
+        warn.textContent = 'Connection problem: ' + (e.message || 'Unable to contact server.') + ' Retrying automatically…';
         warn.style.display = 'block';
       }
     } finally {
       setLoading(false);
-      setPolling(false);
-      setTimeout(poll, POLL_MS);
     }
   }
 
-  async function violation(reason) {
-    if (!armed) return;
+  async function recordViolation(reason) {
+    if (!armedRef.current) return;
     const now = Date.now();
-    if (now - lastV < 1500) return;
-    setLastV(now);
-    const fd = new FormData();
-    fd.append('reason', reason);
+    if (now - lastVRef.current < 1500) return;
+    lastVRef.current = now;
+
     const warn = document.getElementById('warn');
     if (warn) {
       warn.textContent = 'Warning: ' + reason + ' has been recorded.';
       warn.style.display = 'block';
     }
-    getJson(`${API_BASE}/student/violation`, {
-      method: 'POST',
-      body: fd,
-      headers: await authHeaders(),
-    }).then(render).catch(() => {});
+
+    try {
+      const headers = await sessionAuthHeaders();
+      headers['Content-Type'] = 'application/json';
+      const updated = await getJson(`${API_BASE}/student/violation`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ reason }),
+      });
+      render(updated);
+    } catch (_) {}
   }
 
   async function enterFullscreen() {
     const btn = document.getElementById('fsBtn');
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
+
     try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch (fsErr) {
+        console.warn('Fullscreen request rejected or not supported:', fsErr);
       }
-      const fd = new FormData();
-      fd.append('exam_code', document.getElementById('examCodeInput').value || '');
-      const d = await getJson(`${API_BASE}/student/enter`, {
+
+      const examCodeInput = document.getElementById('examCodeInput');
+      const examCode = examCodeInput ? examCodeInput.value.trim().toUpperCase() : '';
+      if (examCode) {
+        localStorage.setItem('exam_student_code', examCode);
+      }
+
+      const headers = await jwtAuthHeaders();
+      headers['Content-Type'] = 'application/json';
+
+      // 1. Enter exam and assign question
+      const enterRes = await getJson(`${API_BASE}/student/enter`, {
         method: 'POST',
-        body: fd,
-        headers: await authHeaders(),
+        headers,
+        body: JSON.stringify({ exam_code: examCode }),
       });
-      if (d.notice) {
+
+      if (enterRes.session_token) {
+        localStorage.setItem('exam_student_token', enterRes.session_token);
+      }
+
+      if (enterRes.notice) {
         const warn = document.getElementById('warn');
         if (warn) {
-          warn.textContent = d.notice;
+          warn.textContent = enterRes.notice;
           warn.style.display = 'block';
         }
       }
-      render(d);
+
+      // 2. Immediately fetch the assigned question body and full state
+      const stateHeaders = await sessionAuthHeaders();
+      const fullState = await getJson(`${API_BASE}/student/state`, {
+        cache: 'no-store',
+        headers: stateHeaders,
+      });
+
+      render(fullState);
       setArmed(true);
-      setEntered(!!d.entered);
+      setEntered(true);
     } catch (e) {
       const warn = document.getElementById('warn');
       if (warn) {
@@ -214,81 +312,104 @@ export default function ExamScreen() {
         warn.style.display = 'block';
       }
     } finally {
-      btn.disabled = false;
+      if (btn) btn.disabled = false;
     }
   }
 
+  // Set up event listeners once on mount
   useEffect(() => {
-    // Read CSRF token from meta if present (kept for parity with original)
-    const meta = document.querySelector('meta[name="csrf"]');
-    if (meta) csrfRef.current = meta.content;
+    function handleVisibility() {
+      if (document.hidden) recordViolation('Tab switch');
+    }
 
-    // Violation detection
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) violation('Tab switch');
-    });
-    window.addEventListener('blur', () => violation('Window lost focus'));
+    function handleBlur() {
+      recordViolation('Window lost focus');
+    }
 
-    document.addEventListener('fullscreenchange', () => {
+    function handleFullscreenChange() {
       if (!document.fullscreenElement) {
-        violation('Left fullscreen');
-        if (lastDataRef.current) render(lastDataRef.current);
-      } else if (lastDataRef.current) {
-        render(lastDataRef.current);
+        recordViolation('Left fullscreen');
       }
-    });
+      if (lastDataRef.current) render(lastDataRef.current);
+    }
 
-    // Block keys
-    document.addEventListener('keydown', (e) => {
+    function handleKeyDown(e) {
       const k = e.key.toLowerCase();
       const bad =
         e.key === 'F12' ||
         e.key === 'PrintScreen' ||
         (e.ctrlKey && ['c', 'v', 'x', 'a', 'u', 's', 'p'].includes(k)) ||
         (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(k)) ||
-        (e.metaKey && ['c', 'v', 'x', 'a', 'u', 's', 'p'].includes(k)) || // macOS fix
-        (e.metaKey && e.shiftKey && ['i', 'j', 'c'].includes(k));        // macOS fix
+        (e.metaKey && ['c', 'v', 'x', 'a', 'u', 's', 'p'].includes(k)) ||
+        (e.metaKey && e.shiftKey && ['i', 'j', 'c'].includes(k));
       if (bad) {
         e.preventDefault();
-        violation('Blocked key: ' + e.key);
+        recordViolation('Blocked key: ' + e.key);
       }
-    });
+    }
 
-    // Block context menu / copy / paste / select / drag
-    ['contextmenu', 'copy', 'cut', 'paste', 'selectstart', 'dragstart'].forEach((ev) => {
-      document.addEventListener(ev, (e) => e.preventDefault());
-    });
+    function blockEvent(e) {
+      e.preventDefault();
+    }
 
-    // Beforeunload warning
-    window.addEventListener('beforeunload', (e) => {
-      if (data && data.status === 'live') {
+    function handleBeforeUnload(e) {
+      if (dataRef.current && dataRef.current.status === 'live') {
         e.preventDefault();
         e.returnValue = '';
       }
-    });
+    }
 
-    poll();
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('keydown', handleKeyDown);
 
-    // Client-side timer
-    const timerId = setInterval(() => {
-      if (data && data.status === 'live' && deadline) {
-        const el = document.getElementById('timer');
-        if (el) el.textContent = fmt(Math.round((deadline - Date.now()) / 1000));
-      }
-    }, 500);
+    const blocked = ['contextmenu', 'copy', 'cut', 'paste', 'selectstart', 'dragstart'];
+    blocked.forEach((ev) => document.addEventListener(ev, blockEvent));
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      clearInterval(timerId);
-      document.removeEventListener('visibilitychange', () => {});
-      window.removeEventListener('blur', () => {});
-      document.removeEventListener('fullscreenchange', () => {});
-      document.removeEventListener('keydown', () => {});
-      ['contextmenu', 'copy', 'cut', 'paste', 'selectstart', 'dragstart'].forEach((ev) => {
-        document.removeEventListener(ev, () => {});
-      });
-      window.removeEventListener('beforeunload', () => {});
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('keydown', handleKeyDown);
+      blocked.forEach((ev) => document.removeEventListener(ev, blockEvent));
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [data]);
+  }, []);
+
+  // Polling loop (separate from data re-renders)
+  useEffect(() => {
+    let active = true;
+
+    async function tick() {
+      if (!active) return;
+      await fetchState();
+      if (active) {
+        pollTimerRef.current = setTimeout(tick, POLL_MS);
+      }
+    }
+
+    tick();
+
+    return () => {
+      active = false;
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
+
+  // Client-side smooth countdown timer
+  useEffect(() => {
+    if (!deadline || !data || data.status !== 'live') return;
+    const timerId = setInterval(() => {
+      const left = Math.round((deadline - Date.now()) / 1000);
+      const el = document.getElementById('timer');
+      if (el) el.textContent = fmt(Math.max(0, left));
+    }, 500);
+    return () => clearInterval(timerId);
+  }, [deadline, data?.status]);
+
+  const defaultExamCode = localStorage.getItem('exam_student_code') || '';
 
   return (
     <div style={style.examRoot}>
@@ -297,21 +418,27 @@ export default function ExamScreen() {
           <b id="examTitle">Exam</b> &middot; Student
         </div>
         <div>
-          <span id="viol"></span> <span id="timer" className="timer" style={style.timer}></span>
+          <span id="viol" style={{ marginRight: 16 }}></span>
+          <span id="timer" className="timer" style={style.timer}></span>
         </div>
       </header>
+
       {backendDown && (
         <div style={style.alertErr}>
           <b>Backend not reachable:</b> The exam server on port 5000 is not running. Please start the backend and refresh this page.
         </div>
       )}
+
       {loading && <Loading message="Connecting to exam server…" />}
+
       <div id="warn" className="alert" style={{ ...style.alert, display: 'none' }}></div>
+
       <main id="main" style={style.main}>
         <p className="muted" style={style.muted}>
           Connecting to the exam server… If this message remains, check the database configuration and browser network errors.
         </p>
       </main>
+
       <div id="fsOverlay" className="overlay" style={{ ...style.overlay, display: 'flex' }}>
         <div style={style.overlayCard}>
           <h2>Start your exam</h2>
@@ -323,6 +450,7 @@ export default function ExamScreen() {
             id="examCodeInput"
             type="text"
             placeholder="Exam code"
+            defaultValue={defaultExamCode}
             style={style.input}
             maxLength="10"
           />
@@ -332,6 +460,7 @@ export default function ExamScreen() {
           </button>
         </div>
       </div>
+
       <style>{`
         .exam { user-select: none; -webkit-user-select: none }
         body.exam, #root.exam { background: #f4f6f9; }
@@ -346,13 +475,9 @@ const style = {
     background: '#1d2433', color: '#fff', padding: '12px 24px',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
   },
-  timer: { fontSize: 20, fontWeight: 'bold', marginLeft: 14 },
+  timer: { fontSize: 20, fontWeight: 'bold' },
   main: { maxWidth: 900, margin: '30px auto', padding: '0 20px' },
   muted: { color: '#6b7280' },
-  question: {
-    whiteSpace: 'pre-wrap', fontSize: 19, lineHeight: 1.65,
-    background: '#fff', padding: 24, borderRadius: 10,
-  },
   overlay: {
     position: 'fixed', inset: 0, background: 'rgba(20,25,40,.92)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -361,6 +486,7 @@ const style = {
   overlayCard: { maxWidth: 420, background: 'rgba(255,255,255,.06)', padding: 24, borderRadius: 10 },
   input: {
     width: '100%', padding: 9, border: 'none', borderRadius: 6, margin: '10px 0', fontSize: 14,
+    boxSizing: 'border-box',
   },
   btn: {
     background: '#2b5cff', color: '#fff', border: 'none', padding: '9px 16px',
@@ -368,10 +494,10 @@ const style = {
   },
   alert: {
     background: '#fde8e8', color: '#9b1c1c', padding: '10px 14px',
-    borderRadius: 6, margin: '10px 0',
+    borderRadius: 6, margin: '10px 20px', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
   },
   alertErr: {
     background: '#fde8e8', color: '#9b1c1c', padding: '10px 14px',
-    borderRadius: 6, margin: '10px 0',
+    borderRadius: 6, margin: '10px 20px', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
   },
 };

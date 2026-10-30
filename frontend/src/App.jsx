@@ -29,7 +29,18 @@ function FacultyLayout({ children }) {
         setOk(!!data.session);
       }
     })();
-    return () => { mounted = false; };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) {
+        setReady(true);
+        setOk(!!session);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
   }, []);
 
   if (!ready) return null;
@@ -43,13 +54,11 @@ function StudentLayout({ children }) {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      const token = localStorage.getItem('exam_student_token');
-      if (mounted) {
-        setReady(true);
-        setOk(!!token);
-      }
-    })();
+    const token = localStorage.getItem('exam_student_token') || localStorage.getItem('exam_student_jwt');
+    if (mounted) {
+      setReady(true);
+      setOk(!!token);
+    }
     return () => { mounted = false; };
   }, []);
 

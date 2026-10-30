@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { useNavigate } from 'react-router-dom';
+import { LoadingButtonContent } from '../components/Loading.jsx';
 
 export default function FacultyLogin() {
   const [email, setEmail] = useState('');
@@ -8,6 +9,14 @@ export default function FacultyLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session) {
+        navigate('/faculty/dashboard', { replace: true });
+      }
+    });
+  }, [navigate]);
 
   async function handleSignup(e) {
     e.preventDefault();

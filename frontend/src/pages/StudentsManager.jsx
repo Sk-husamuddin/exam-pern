@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost, apiDelete, apiFormPost } from '../lib/api.js';
 import Loading from '../components/Loading.jsx';
@@ -22,9 +23,8 @@ export default function StudentsManager() {
 
   async function loadStudents() {
     try {
-      const url = new URL('/faculty/students', window.location.origin);
-      if (search) url.searchParams.set('q', search);
-      const json = await apiGet(url.pathname + url.search);
+      const q = search ? `?q=${encodeURIComponent(search)}` : '';
+      const json = await apiGet(`/faculty/students${q}`);
       setStudents(json.students || []);
       setTotal(json.students ? json.students.length : 0);
     } catch (err) {
@@ -107,7 +107,7 @@ export default function StudentsManager() {
         <nav style={style.nav}>
           <span>Students</span>
           <span style={style.spacer}></span>
-          <a href="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</a>
+          <Link to="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</Link>
         </nav>
 
         {flash && (
@@ -149,7 +149,13 @@ export default function StudentsManager() {
             <h3 style={{ marginTop: 0 }}>2. Import from Excel</h3>
             <p style={style.muted}>
               File (.xlsx or .csv): <b>Column A = username</b>, <b>Column B = full name</b>. A header row is allowed.{' '}
-              <a href="#" style={style.link}>Download sample file</a>
+              <a
+                href="data:text/csv;charset=utf-8,username%2Cname%0A21CS001%2CRavi%20Kumar%0A21CS002%2CPriya%20Sharma"
+                download="sample_students.csv"
+                style={style.link}
+              >
+                Download sample file
+              </a>
             </p>
             <form onSubmit={importStudents} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <label style={style.label}>Excel / CSV file</label>
@@ -179,30 +185,38 @@ export default function StudentsManager() {
           />
           <button type="submit" style={style.btnSm}>Search</button>
           {search !== '' && (
-            <a href="/faculty/students" style={style.btnLink}>Clear</a>
+            <button type="button" onClick={() => setSearch('')} style={style.btnLink}>Clear</button>
           )}
         </form>
 
         <table style={style.table}>
           <thead>
             <tr>
-              <th>Username</th>
-              <th>Full name</th>
-              <th></th>
+              <th style={style.th}>Username</th>
+              <th style={style.th}>Full name</th>
+              <th style={style.th}></th>
             </tr>
           </thead>
           <tbody>
             {students.map((s) => (
               <tr key={s.id}>
-                <td>{s.username}</td>
-                <td>{s.name}</td>
-                <td style={style.tdActions}>
-                  <form onSubmit={(e) => { e.preventDefault(); resetPassword(s.id, s.username); }} style={{ display: 'inline', marginRight: 6 }}>
-                    <button style={style.btnSmGray}>Reset password</button>
-                  </form>
-                  <form onSubmit={(e) => { e.preventDefault(); deleteStudent(s.id, s.username); }} style={{ display: 'inline' }}>
-                    <button style={style.btnSmRed}>Delete</button>
-                  </form>
+                <td style={style.td}>{s.username}</td>
+                <td style={style.td}>{s.name}</td>
+                <td style={{ ...style.td, ...style.tdActions }}>
+                  <button
+                    type="button"
+                    onClick={() => resetPassword(s.id, s.username)}
+                    style={style.btnSmGray}
+                  >
+                    Reset password
+                  </button>{' '}
+                  <button
+                    type="button"
+                    onClick={() => deleteStudent(s.id, s.username)}
+                    style={style.btnSmRed}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

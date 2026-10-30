@@ -38,14 +38,17 @@ export default function StudentLogin() {
       });
       const joinJson = await joinRes.json();
       if (joinJson.error) {
-        // Still logged in, but exam code invalid. Go to dashboard.
         setError(joinJson.error);
-        navigate('/student/dashboard');
         return;
       }
       // Store the session token returned by /enter (stored in exam_sessions.token)
+      localStorage.setItem('exam_student_code', examCode.trim().toUpperCase());
       localStorage.setItem('exam_student_token', joinJson.session_token);
-      navigate('/student/exam');
+      if (joinJson.status === 'live') {
+        navigate('/student/exam');
+      } else {
+        navigate('/student/dashboard');
+      }
     } catch (err) {
       setError(err.message || 'Login failed');
     } finally {
