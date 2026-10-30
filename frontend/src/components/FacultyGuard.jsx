@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { LoadingScreen } from './ui.jsx';
 
@@ -7,9 +7,9 @@ import { LoadingScreen } from './ui.jsx';
  * Guards faculty routes.
  * - While the Supabase session is loading: renders LoadingScreen.
  * - No session: redirects to /faculty/login (replace).
- * - Session present: renders children.
+ * - Session present: renders the matched child route (via <Outlet />).
  */
-export default function FacultyGuard({ children }) {
+export default function FacultyGuard() {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
 
@@ -28,5 +28,5 @@ export default function FacultyGuard({ children }) {
 
   if (loading) return <LoadingScreen />;
   if (!authorized) return <Navigate to="/faculty/login" replace />;
-  return <>{children}</>;
+  return <Outlet />;
 }

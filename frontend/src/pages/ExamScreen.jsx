@@ -11,7 +11,6 @@ export default function ExamScreen() {
   const [armed, setArmed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [deadline, setDeadline] = useState(0);
-  const [examCode, setExamCode] = useState(() => localStorage.getItem('exam_student_code') || '');
   const [entering, setEntering] = useState(false);
   const [timeLeftStr, setTimeLeftStr] = useState('');
 
@@ -20,6 +19,7 @@ export default function ExamScreen() {
   const lastVRef = useRef(0);
   const dataRef = useRef(null);
   const pollTimerRef = useRef(null);
+  const armedOnMountRef = useRef(false);
 
   const POLL_MS = 3000;
 
@@ -32,19 +32,18 @@ export default function ExamScreen() {
   }, [data]);
 
   async function sessionAuthHeaders() {
-    const token = localStorage.getItem('exam_student_token');
+    const token = sessionStorage.getItem('exam_student_token');
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
   async function jwtAuthHeaders() {
-    const token = localStorage.getItem('exam_student_jwt');
+    const token = sessionStorage.getItem('exam_student_jwt');
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
   async function checkBackendHealth() {
     try {
-      const base = API_BASE.startsWith('http') ? API_BASE.replace(/\/api$/, '') : '';
-      const res = await fetch(`${base}/health`, {
+      const res = await fetch(`${API_BASE}/health`, {
         method: 'GET',
         signal: AbortSignal.timeout(3000),
       });
@@ -111,7 +110,7 @@ export default function ExamScreen() {
   }
 
   function sendLeaveSignal() {
-    const token = localStorage.getItem('exam_student_token');
+    const token = sessionStorage.getItem('exam_student_token');
     if (!token) return;
     try {
       const url = `${API_BASE}/student/leave`;
@@ -194,49 +193,68 @@ export default function ExamScreen() {
         console.warn('Fullscreen request rejected or not supported:', fsErr);
       }
 
-      const code = (examCode || '').trim().toUpperCase();
-      if (code) {
-        localStorage.setItem('exam_student_code', code);
-      }
-
-      const headers = await jwtAuthHeaders();
-      headers['Content-Type'] = 'application/json';
-
-      // 1. Enter exam and assign question
-      const enterRes = await getJson(`${API_BASE}/student/enter`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ exam_code: code }),
-      });
-
-      if (enterRes.session_token) {
-        localStorage.setItem('exam_student_token', enterRes.session_token);
-      }
-
-      if (enterRes.notice) {
-        setWarning(enterRes.notice);
-      }
-
-      // 2. Immediately fetch the assigned question body and full state
-      const stateHeaders = await sessionAuthHeaders();
-      const fullState = await getJson(`${API_BASE}/student/state`, {
-        cache: 'no-store',
-        headers: stateHeaders,
-      });
-
-      applyData(fullState);
-      if (!fullState.locked) {
-        setArmed(true);
-      }
+      // Arm the exam once fullscreen is active; violations only count from here on
+      setArmed(true);
     } catch (e) {
-      setWarning('Unable to enter exam: ' + (e.message || 'Please try again.'));
+      setWarning('Unable to enter fullscreen: ' + (e.message || 'Please try again.'));
     } finally {
       setEntering(false);
     }
   }
 
+  async function loadStateAndEnter() {
+    const token = sessionStorage.getItem('exam_student_token');
+    if (!token) {
+      window.location.href = '/student/login';
+      return;
+    }
+
+    try {
+      const d = await getJson(`${API_BASE}/student/state`, {
+        cache: 'no-store',
+        headers: await sessionAuthHeaders(),
+      });
+
+      if (!d.entered) {
+        // Not assigned yet: call /enter using the exam code from sessionStorage (no user input)
+        const code = sessionStorage.getItem('exam_student_code') || '';
+        const enterRes = await getJson(`${API_BASE}/student/enter`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(await jwtAuthHeaders()),
+          },
+          body: JSON.stringify({ exam_code: code }),
+        });
+        applyData(enterRes);
+        if (!enterRes.locked && document.fullscreenElement) {
+          setArmed(true);
+        }
+      } else {
+        applyData(d);
+        if (!d.locked && document.fullscreenElement) {
+          setArmed(true);
+        }
+      }
+    } catch (e) {
+      setWarning('Unable to load exam: ' + (e.message || 'Please try again.'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Set up event listeners once on mount
   useEffect(() => {
+    let mounted = true;
+
+    // No student token → redirect to login
+    if (!sessionStorage.getItem('exam_student_token')) {
+      window.location.href = '/student/login';
+      return;
+    }
+
+    loadStateAndEnter();
+
     function handleVisibility() {
       if (document.hidden) {
         sendLeaveSignal();
@@ -341,13 +359,14 @@ export default function ExamScreen() {
     return () => clearInterval(timerId);
   }, [deadline, data?.status, data?.locked]);
 
-  // The overlay is shown ONLY if the exam is NOT locked and student has not entered or is not in fullscreen
+  // The overlay is shown ONLY when the exam is live, not locked, and not in fullscreen.
+  // The question is hidden behind it until fullscreen is active.
   const showOverlay =
     !loading &&
     data &&
     data.status === 'live' &&
     !data.locked &&
-    (!data.entered || !isFullscreen);
+    !isFullscreen;
 
   const readyToShowQuestion =
     data &&
@@ -425,32 +444,23 @@ export default function ExamScreen() {
           ) : (
             <div style={style.card}>
               <p style={{ color: '#4b5563', margin: 0, fontSize: 15 }}>
-                Exam is ready. Please click &ldquo;Enter fullscreen &amp; show my question&rdquo; below to view your question.
+                Waiting for the faculty to start the exam…
               </p>
             </div>
           )}
         </main>
       )}
 
-      {/* Fullscreen Entry Modal: NEVER shown if exam is locked */}
+      {/* Fullscreen Entry Overlay: shown when the exam is live but not in fullscreen.
+           NEVER shown if exam is locked. No exam-code input here. */}
       {showOverlay && (
         <div id="fsOverlay" className="overlay" style={style.overlay}>
           <div style={style.overlayCard}>
-            <h2 style={{ marginTop: 0 }}>Start your exam</h2>
+            <h2 style={{ marginTop: 0 }}>Return to fullscreen to continue</h2>
             <p style={{ fontSize: 14, lineHeight: 1.5, color: '#e5e7eb' }}>
-              The exam is live. Click below to go fullscreen. One question from the faculty question list for this exam is
-              assigned to you and shown. Switching tabs or leaving fullscreen is recorded as a violation.
+              The exam is live and your question is ready. Click below to enter fullscreen.
+              Switching tabs or leaving fullscreen is recorded as a violation.
             </p>
-            <input
-              id="examCodeInput"
-              type="text"
-              placeholder="Exam code"
-              value={examCode}
-              onChange={(e) => setExamCode(e.target.value.toUpperCase())}
-              style={style.input}
-              maxLength="10"
-            />
-            <br />
             <button
               className="btn"
               id="fsBtn"
@@ -458,7 +468,7 @@ export default function ExamScreen() {
               disabled={entering}
               style={style.btn}
             >
-              {entering ? 'Entering…' : 'Enter fullscreen & show my question'}
+              {entering ? 'Entering…' : 'Enter fullscreen'}
             </button>
           </div>
         </div>
@@ -507,10 +517,6 @@ const style = {
     zIndex: 99, textAlign: 'center', color: '#fff', fontFamily: 'system-ui, sans-serif',
   },
   overlayCard: { maxWidth: 420, background: 'rgba(255,255,255,.08)', padding: 28, borderRadius: 12 },
-  input: {
-    width: '100%', padding: 10, border: 'none', borderRadius: 6, margin: '12px 0', fontSize: 15,
-    boxSizing: 'border-box', textAlign: 'center', letterSpacing: 2, fontWeight: 'bold',
-  },
   btn: {
     background: '#2b5cff', color: '#fff', border: 'none', padding: '10px 18px',
     borderRadius: 6, cursor: 'pointer', fontSize: 14, marginTop: 10, fontWeight: 600,

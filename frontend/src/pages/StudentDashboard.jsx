@@ -144,6 +144,11 @@ export default function StudentDashboard() {
               localStorage.removeItem('exam_student_jwt');
               localStorage.removeItem('exam_student_user');
               localStorage.removeItem('exam_student_code');
+              sessionStorage.removeItem('exam_student_token');
+              sessionStorage.removeItem('exam_student_jwt');
+              sessionStorage.removeItem('exam_student_user');
+              sessionStorage.removeItem('exam_student_code');
+              sessionStorage.removeItem('exam_student_title');
               window.location.href = '/student/login';
             }}
             style={style.btnDanger}

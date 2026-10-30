@@ -205,6 +205,14 @@ export function StudentAuth() {
     if (loading) return;
     setError('');
     setLoading(true);
+
+    // Step 1: request fullscreen synchronously as a user gesture
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch (_) {}
+
     try {
       const res = await fetch('/auth/student/login', {
         method: 'POST',
@@ -229,11 +237,18 @@ export function StudentAuth() {
       if (!enterRes.ok) throw new Error(enterJson.error || 'Invalid exam code, or the exam has ended');
       if (enterJson.error) throw new Error(enterJson.error);
 
-      localStorage.setItem('exam_student_code', code.trim().toUpperCase());
-      localStorage.setItem('exam_student_token', enterJson.session_token);
-      if (enterJson.status === 'live') window.location.href = '/student/exam';
-      else window.location.href = '/student/dashboard';
+      // Store for ExamScreen; cleared on logout/exam end
+      sessionStorage.setItem('exam_student_jwt', json.studentJwt);
+      sessionStorage.setItem('exam_student_user', JSON.stringify(json.user));
+      sessionStorage.setItem('exam_student_token', enterJson.session_token);
+      sessionStorage.setItem('exam_student_code', code.trim().toUpperCase());
+      sessionStorage.setItem('exam_student_title', enterJson.title || '');
+
+      window.location.href = '/student/exam';
     } catch (err) {
+      if (document.fullscreenElement) {
+        try { document.exitFullscreen(); } catch (_) {}
+      }
       setError(err.message || 'Login failed');
     } finally {
       setLoading(false);

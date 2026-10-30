@@ -8,7 +8,6 @@ import LiveMonitor from './pages/LiveMonitor.jsx';
 import StudentDashboard from './pages/StudentDashboard.jsx';
 import ExamScreen from './pages/ExamScreen.jsx';
 import FacultyGuard from './components/FacultyGuard.jsx';
-import StudentGuard from './components/StudentGuard.jsx';
 import NotFound from './components/NotFound.jsx';
 
 export default function App() {
@@ -29,12 +28,9 @@ export default function App() {
         <Route path="/faculty/monitor/:examId" element={<LiveMonitor />} />
       </Route>
 
-      {/* Student area — redirects and guarded routes */}
-      <Route path="/student" element={<Navigate to="/student/dashboard" replace />} />
-      <Route element={<StudentGuard />}>
-        <Route path="/student/dashboard" element={<StudentDashboard />} />
-        <Route path="/student/exam" element={<ExamScreen />} />
-      </Route>
+      {/* Student area */}
+      <Route path="/student/dashboard" element={<StudentDashboard />} />
+      <Route path="/student/exam" element={<ExamScreen />} />
 
       {/* Catch-all: only truly unknown URLs */}
       <Route path="*" element={<NotFound />} />
