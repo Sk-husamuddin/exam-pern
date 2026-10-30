@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 export default function FacultyDashboard() {
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [selStudents, setSelStudents] = useState(0);
@@ -19,16 +19,41 @@ export default function FacultyDashboard() {
     fetchExams();
   }, []);
 
+  // ------------------------------------------------------------------
+  // Defensive adapter: map backend exam rows to the shape the UI uses.
+  // Never throws on missing/unexpected fields.
+  // ------------------------------------------------------------------
+  const adaptExam = (e) => {
+    if (!e || typeof e !== 'object') return null;
+    return {
+      id: e.id,
+      code: e.code,
+      title: e.title,
+      status: e.status,
+      qc: Number(e.qc) || 0,
+      sc: Number(e.sc) || 0,
+      duration_min: Number(e.duration_min) || 60,
+      max_violations: Number(e.max_violations) || 3,
+      started_at: e.started_at,
+    };
+  };
+
   async function fetchExams() {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
       const json = await apiGet('/faculty/exams');
-      setExams(json.exams || []);
+      const rows = Array.isArray(json?.exams) ? json.exams : [];
+      setExams(rows.map(adaptExam).filter(Boolean));
     } catch (err) {
-      setError('Failed to load exams');
+      setError(err.message || 'Failed to load exams');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function retry() {
+    await fetchExams();
   }
 
   async function createExam(e) {
@@ -39,13 +64,13 @@ export default function FacultyDashboard() {
         duration: form.duration,
         max_violations: form.max_violations,
       });
-      if (json.ok) {
+      if (json && json.ok) {
         setFlash({ type: 'ok', msg: json.message });
         setShowCreate(false);
         setForm({ title: '', duration: 60, max_violations: 3 });
-        fetchExams();
+        await fetchExams();
       } else {
-        setFlash({ type: 'err', msg: json.error });
+        setFlash({ type: 'err', msg: json && json.error ? json.error : 'Create failed' });
       }
     } catch (err) {
       setFlash({ type: 'err', msg: err.message || 'Create failed' });
@@ -55,10 +80,10 @@ export default function FacultyDashboard() {
   async function startExam(id) {
     try {
       const json = await apiPost(`/faculty/exams/${id}/start`);
-      if (json.ok) {
-        fetchExams();
+      if (json && json.ok) {
+        await fetchExams();
       } else {
-        alert(json.error || 'Failed to start exam');
+        alert(json && json.error ? json.error : 'Failed to start exam');
       }
     } catch (err) {
       alert(err.message || 'Start failed');
@@ -69,7 +94,7 @@ export default function FacultyDashboard() {
     if (!confirm('End the exam for everyone?')) return;
     try {
       await apiPost(`/faculty/exams/${id}/end`);
-      fetchExams();
+      await fetchExams();
     } catch (err) {
       alert(err.message || 'End failed');
     }
@@ -79,31 +104,70 @@ export default function FacultyDashboard() {
     if (!confirm('Delete this exam and all its records?')) return;
     try {
       await apiDelete(`/faculty/exams/${id}`);
-      fetchExams();
+      await fetchExams();
     } catch (err) {
       alert(err.message || 'Delete failed');
     }
   }
 
   async function loadExamDetail(id) {
+    setError(null);
     try {
       const json = await apiGet(`/faculty/exams/${id}`);
-      setSelected(json.exam);
-      setQuestions(json.exam.questions || []);
-      setSelStudents(json.exam.sc || 0);
+      const exam = adaptExam(json && json.exam ? json.exam : null);
+      setSelected(exam);
+      setQuestions(Array.isArray(json && json.exam && json.exam.questions) ? json.exam.questions : []);
+      setSelStudents(json && json.exam ? Number(json.exam.sc || 0) : 0);
     } catch (err) {
-      setError('Failed to load exam detail');
+      setError(err.message || 'Failed to load exam detail');
     }
   }
 
-  const totalExams = exams.length;
-  const liveExams = exams.filter((e) => e.status === 'live').length;
+  const totalExams = Array.isArray(exams) ? exams.length : 0;
+  const liveExams = Array.isArray(exams)
+    ? exams.filter((e) => e && e.status === 'live').length
+    : 0;
+
+  const statusColor = (s) =>
+    s === 'live' ? 'live' : s === 'ended' ? 'ended' : 'draft';
 
   return (
     <div style={style.page}>
       {loading && <Loading />}
       {!loading && (
         <>
+        {error && (
+          <div
+            role="alert"
+            aria-live="polite"
+            style={{
+              ...style.flash,
+              ...style.flashErr,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{error}</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={retry}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid currentColor',
+                  color: 'currentColor',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
         <nav style={style.nav}>
           <b>Exam Portal</b>
           <span style={style.spacer}></span>
@@ -189,61 +253,62 @@ export default function FacultyDashboard() {
             </tr>
           </thead>
           <tbody>
-            {exams.map((e) => (
-              <tr key={e.id} style={selected?.id === e.id ? style.selRow : {}}>
-                <td style={style.td}>
-                  <button
-                    type="button"
-                    onClick={() => loadExamDetail(e.id)}
-                    style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#1d2433', fontSize: 14 }}
-                    title="Click to view details below"
-                  >
-                    <b>{e.title}</b>
-                  </button>
-                </td>
-                <td style={style.td}><b>{e.code}</b></td>
-                <td style={style.td}>
-                  <span style={style.badge(statusColor(e.status))}>{e.status}</span>
-                </td>
-                <td style={style.td}>{e.qc}</td>
-                <td style={style.td}>{e.sc}</td>
-                <td style={style.td}>{e.duration_min} min</td>
-                <td style={{ ...style.td, ...style.tdActions }}>
-                  <Link to={`/faculty/questions/${e.id}`}>
-                    <button style={style.btnSm}>{e.status === 'draft' ? 'Manage questions' : 'View'}</button>
-                  </Link>{' '}
-                  <Link to={`/faculty/monitor/${e.id}`}>
-                    <button style={style.btnSmGreen}>Monitor</button>
-                  </Link>
-                  {e.status !== 'live' && (
-                    <button onClick={() => deleteExam(e.id)} style={style.btnSmRed}>
-                      Delete
-                    </button>
-                  )}
-                  {e.status === 'draft' && (
-                    <button
-                      onClick={() => startExam(e.id)}
-                      disabled={e.qc === 0}
-                      style={{ ...style.btnSmGreen, ...(e.qc === 0 ? style.disabled : {}) }}
-                      title={e.qc === 0 ? 'Add at least one question first' : ''}
-                    >
-                      Start exam
-                    </button>
-                  )}
-                  {e.status === 'live' && (
-                    <button onClick={() => endExam(e.id)} style={style.btnSmRed}>
-                      End exam
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {exams.length === 0 && (
+            {totalExams === 0 ? (
               <tr>
                 <td colSpan={7} style={style.mutedTd}>
                   No exams yet. Create your first exam above.
                 </td>
               </tr>
+            ) : (
+              exams.map((e) => (
+                <tr key={e.id} style={selected?.id === e.id ? style.selRow : {}}>
+                  <td style={style.td}>
+                    <button
+                      type="button"
+                      onClick={() => loadExamDetail(e.id)}
+                      style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#1d2433', fontSize: 14 }}
+                      title="Click to view details below"
+                    >
+                      <b>{e.title}</b>
+                    </button>
+                  </td>
+                  <td style={style.td}><b>{e.code}</b></td>
+                  <td style={style.td}>
+                    <span style={style.badge(statusColor(e.status))}>{e.status}</span>
+                  </td>
+                  <td style={style.td}>{e.qc}</td>
+                  <td style={style.td}>{e.sc}</td>
+                  <td style={style.td}>{e.duration_min} min</td>
+                  <td style={{ ...style.td, ...style.tdActions }}>
+                    <Link to={`/faculty/questions/${e.id}`}>
+                      <button style={style.btnSm}>{e.status === 'draft' ? 'Manage questions' : 'View'}</button>
+                    </Link>{' '}
+                    <Link to={`/faculty/monitor/${e.id}`}>
+                      <button style={style.btnSmGreen}>Monitor</button>
+                    </Link>
+                    {e.status !== 'live' && (
+                      <button onClick={() => deleteExam(e.id)} style={style.btnSmRed}>
+                        Delete
+                      </button>
+                    )}
+                    {e.status === 'draft' && (
+                      <button
+                        onClick={() => startExam(e.id)}
+                        disabled={e.qc === 0}
+                        style={{ ...style.btnSmGreen, ...(e.qc === 0 ? style.disabled : {}) }}
+                        title={e.qc === 0 ? 'Add at least one question first' : ''}
+                      >
+                        Start exam
+                      </button>
+                    )}
+                    {e.status === 'live' && (
+                      <button onClick={() => endExam(e.id)} style={style.btnSmRed}>
+                        End exam
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>

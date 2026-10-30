@@ -10,7 +10,7 @@ export default function QuestionsEditor() {
   const [questions, setQuestions] = useState([]);
   const [draft, setDraft] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [flash, setFlash] = useState(null);
 
   // Manual add
@@ -27,17 +27,23 @@ export default function QuestionsEditor() {
   }, [examId]);
 
   async function loadExam() {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
       const json = await apiGet(`/faculty/exams/${examId}`);
-      setExam(json.exam);
-      setQuestions(json.exam.questions || []);
-      setDraft(json.exam.status === 'draft');
+      const ex = json && json.exam ? json.exam : null;
+      setExam(ex ? { ...ex, title: ex.title || '', code: ex.code || '' } : null);
+      setQuestions(Array.isArray(ex && ex.questions) ? ex.questions : []);
+      setDraft(ex ? ex.status === 'draft' : false);
     } catch (err) {
-      setError('Failed to load exam');
+      setError(err.message || 'Failed to load exam');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function retry() {
+    await loadExam();
   }
 
   async function addQuestion(e) {
@@ -48,11 +54,11 @@ export default function QuestionsEditor() {
         exam_id: examId,
         body: manualBody.trim(),
       });
-      if (json.ok) {
+      if (json && json.ok) {
         setManualBody('');
-        loadExam();
+        await loadExam();
       } else {
-        setFlash({ type: 'err', msg: json.error });
+        setFlash({ type: 'err', msg: json && json.error ? json.error : 'Add failed' });
       }
     } catch (err) {
       setFlash({ type: 'err', msg: err.message || 'Add failed' });
@@ -62,8 +68,8 @@ export default function QuestionsEditor() {
   async function updateQuestion(qId, body) {
     try {
       const json = await apiPut(`/faculty/questions/${qId}`, { body });
-      if (json.ok) loadExam();
-      else alert(json.error);
+      if (json && json.ok) await loadExam();
+      else alert(json && json.error ? json.error : 'Update failed');
     } catch (err) {
       alert(err.message || 'Update failed');
     }
@@ -73,7 +79,7 @@ export default function QuestionsEditor() {
     if (!confirm('Delete this question?')) return;
     try {
       await apiDelete(`/faculty/questions/${qId}`);
-      loadExam();
+      await loadExam();
     } catch (err) {
       alert('Failed to delete');
     }
@@ -94,10 +100,10 @@ export default function QuestionsEditor() {
 
     try {
       const json = await apiFormPost('/faculty/questions/import-docx', formData);
-      if (json.ok) {
-        setPreview({ items: json.items || [], ignored: json.ignored || 0, mode: json.mode, file: file.name, note: json.note });
+      if (json && json.ok) {
+        setPreview({ items: Array.isArray(json.items) ? json.items : [], ignored: Number(json.ignored) || 0, mode: json.mode, file: file.name, note: json.note });
       } else {
-        setFlash({ type: 'err', msg: json.error });
+        setFlash({ type: 'err', msg: json && json.error ? json.error : 'Import failed' });
       }
     } catch (err) {
       setFlash({ type: 'err', msg: 'Import failed' });
@@ -119,12 +125,12 @@ export default function QuestionsEditor() {
         exam_id: examId,
         questions: items,
       });
-      if (json.ok) {
+      if (json && json.ok) {
         setPreview(null);
         setFlash({ type: 'ok', msg: json.message });
-        loadExam();
+        await loadExam();
       } else {
-        setFlash({ type: 'err', msg: json.error });
+        setFlash({ type: 'err', msg: json && json.error ? json.error : 'Confirm failed' });
       }
     } catch (err) {
       setFlash({ type: 'err', msg: err.message || 'Confirm failed' });
@@ -145,10 +151,40 @@ export default function QuestionsEditor() {
       {loading && <Loading />}
       {!loading && (
         <>
+        {error && (
+          <div
+            role="alert"
+            aria-live="polite"
+            style={{
+              ...style.flash,
+              ...style.flashErr,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{error}</span>
+            <button
+              onClick={retry}
+              style={{
+                background: 'transparent',
+                border: '1px solid currentColor',
+                color: 'currentColor',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '2px 8px',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
         <nav style={style.nav}>
           <Link to="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</Link>
           <span style={style.spacer}></span>
-          <span>Questions — {exam?.title}</span>
+          <span>Questions — {exam && exam.title ? exam.title : ''}</span>
         </nav>
 
         {flash && (
@@ -256,6 +292,7 @@ export default function QuestionsEditor() {
             )}
 
             <h3 id="list" style={style.h3}>Questions in this exam ({questions.length})</h3>
+            {questions.length === 0 && <p style={style.muted}>No questions yet.</p>}
             {questions.map((q) => (
               <div key={q.id} style={style.cardItem}>
                 <div style={style.qheadItem}>
@@ -292,7 +329,6 @@ export default function QuestionsEditor() {
                 )}
               </div>
             ))}
-            {questions.length === 0 && <p style={style.muted}>No questions yet.</p>}
           </>
         )}
         </>

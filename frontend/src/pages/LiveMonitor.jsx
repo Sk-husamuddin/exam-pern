@@ -9,16 +9,16 @@ export default function LiveMonitor() {
   const [exam, setExam] = useState(null);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
 
   const POLL_MS = 3000;
 
   async function poll() {
     try {
       const json = await apiGet(`/faculty/state?exam_id=${examId}`);
-      setExam((prev) => ({ ...(prev || {}), ...json.exam }));
-      setStudents(json.students || []);
-      setError('');
+      setExam((prev) => ({ ...(prev || {}), ...(json && json.exam ? json.exam : {}) }));
+      setStudents(Array.isArray(json && json.students) ? json.students : []);
+      setError(null);
     } catch (err) {
       setError(err.message || 'Poll failed');
     } finally {
@@ -26,12 +26,16 @@ export default function LiveMonitor() {
     }
   }
 
+  async function retry() {
+    await poll();
+  }
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const detail = await apiGet(`/faculty/exams/${examId}`);
-        if (mounted && detail?.exam) {
+        if (mounted && detail && detail.exam) {
           setExam((prev) => ({ ...detail.exam, ...(prev || {}) }));
         }
       } catch (err) {
@@ -63,8 +67,8 @@ export default function LiveMonitor() {
 
     try {
       const json = await apiPost('/faculty/action', { exam_id: examId, action, sid });
-      if (json.error) alert(json.error);
-      poll();
+      if (json && json.error) alert(json.error);
+      await poll();
     } catch (err) {
       alert(err.message || 'Action failed');
     }
@@ -92,13 +96,13 @@ export default function LiveMonitor() {
     };
 
     const rows = students.map((s) => [
-      s.username,
-      s.name,
-      s.position ? `Q${s.position}` : 'Not Entered',
-      s.question_text || (s.position ? `Question ${s.position}` : 'Not Entered'),
-      s.violations,
-      s.locked ? 'Locked' : s.online ? 'Online' : 'Offline',
-      s.login_time || '',
+      s && s.username,
+      s && s.name,
+      s && s.position ? `Q${s.position}` : 'Not Entered',
+      s && s.question_text ? s.question_text : (s && s.position ? `Question ${s.position}` : 'Not Entered'),
+      s && s.violations != null ? s.violations : 0,
+      s && s.locked ? 'Locked' : s && s.online ? 'Online' : 'Offline',
+      s && s.login_time ? s.login_time : '',
     ]);
 
     const csvContent =
@@ -111,7 +115,7 @@ export default function LiveMonitor() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const safeTitle = (exam.title || 'exam').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeTitle = (exam && exam.title ? exam.title : 'exam').replace(/[^a-zA-Z0-9_-]/g, '_');
     link.download = `${safeTitle}_assigned_questions.csv`;
     document.body.appendChild(link);
     link.click();
@@ -126,6 +130,11 @@ export default function LiveMonitor() {
     const s = Math.floor(sec % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
   };
+
+  const statusBadge = (s) => ({
+    padding: '2px 8px', borderRadius: 10, fontSize: 12, color: '#fff',
+    background: s === 'live' ? '#1a8f4a' : s === 'ended' ? '#d33' : '#b7791f',
+  });
 
   if (loading && !exam) return <Loading />;
 
@@ -145,16 +154,46 @@ export default function LiveMonitor() {
       <nav style={style.nav}>
         <Link to="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</Link>
         <span style={style.spacer}></span>
-        <span>Live Monitor — {exam.title}</span>
+        <span>Live Monitor — {exam.title || ''}</span>
       </nav>
 
+      {error && (
+        <div
+          role="alert"
+          aria-live="polite"
+          style={{
+            ...style.alertErr,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span>{error}</span>
+          <button
+            onClick={retry}
+            style={{
+              background: 'transparent',
+              border: '1px solid currentColor',
+              color: 'currentColor',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+              padding: '2px 8px',
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div style={style.card}>
-        <h2 style={{ margin: 0 }}>{exam.title}</h2>
+        <h2 style={{ margin: 0 }}>{exam.title || ''}</h2>
         <div style={style.meta}>
-          <span>Exam code: <b>{exam.code}</b></span>
-          <span>Status: <span id="status" style={style.badge(exam.status)}>{exam.status}</span></span>
+          <span>Exam code: <b>{exam.code || ''}</b></span>
+          <span>Status: <span id="status" style={style.badge(exam.status)}>{exam.status || ''}</span></span>
           <span>Time left: <b id="timeLeft">{fmt(exam.seconds_left)}</b></span>
-          <span>Questions: <b>{exam.total_q}</b></span>
+          <span>Questions: <b>{exam.total_q != null ? exam.total_q : 0}</b></span>
           <span style={style.floatRight}>
             {exam.status === 'draft' && (
               <button onClick={() => act('start')} style={style.btnSmGreen}>Start exam</button>
@@ -177,8 +216,6 @@ export default function LiveMonitor() {
           </span>
         </div>
       </div>
-
-      {error && <div style={style.alertErr}>{error}</div>}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 16 }}>
         <h3 style={{ margin: 0, fontSize: 16 }}>
@@ -218,25 +255,25 @@ export default function LiveMonitor() {
             </tr>
           ) : (
             students.map((s) => (
-              <tr key={s.sid}>
-                <td style={style.td}>{s.login_order}</td>
+              <tr key={s && s.sid ? s.sid : Math.random()}>
+                <td style={style.td}>{s && s.login_order}</td>
                 <td style={style.td}>
-                  <div>{s.name}</div>
-                  <small style={style.muted}>{s.username}</small>
+                  <div>{s && s.name}</div>
+                  <small style={style.muted}>{s && s.username}</small>
                 </td>
                 <td style={style.td}>
                   <span
-                    style={{ ...style.dot, ...(s.online ? style.dotOn : {}) }}
+                    style={{ ...style.dot, ...(s && s.online ? style.dotOn : {}) }}
                   ></span>
-                  {s.online ? 'online' : 'offline'}
+                  {s && s.online ? 'online' : 'offline'}
                 </td>
-                <td style={style.td}>{s.login_time}</td>
-                <td style={style.td}>{s.position ? `Q${s.position}` : <span style={style.muted}>not entered</span>}</td>
-                <td style={style.td}>{s.violations}/{exam.max || 3}</td>
-                <td style={{ ...style.td, ...style.muted }}>{s.last_reason || '-'}</td>
-                <td style={style.td}>{s.locked ? <span style={style.badgeEnded}>locked</span> : 'ok'}</td>
+                <td style={style.td}>{s && s.login_time}</td>
+                <td style={style.td}>{s && s.position ? `Q${s.position}` : <span style={style.muted}>not entered</span>}</td>
+                <td style={style.td}>{s != null ? s.violations : 0}/{exam && exam.max != null ? exam.max : 3}</td>
+                <td style={{ ...style.td, ...style.muted }}>{s && s.last_reason || '-'}</td>
+                <td style={style.td}>{s && s.locked ? <span style={style.badgeEnded}>locked</span> : 'ok'}</td>
                 <td style={style.td}>
-                  {s.locked ? (
+                  {s && s.locked ? (
                     <button onClick={() => act('unlock', s.sid)} style={style.btnSm}>Unlock</button>
                   ) : (
                     <button onClick={() => act('lock', s.sid)} style={style.btnSmRed}>Lock</button>

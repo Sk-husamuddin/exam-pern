@@ -8,7 +8,7 @@ export default function StudentsManager() {
   const [students, setStudents] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [flash, setFlash] = useState(null);
   const [search, setSearch] = useState('');
   const [file, setFile] = useState(null);
@@ -22,16 +22,23 @@ export default function StudentsManager() {
   }, [search]);
 
   async function loadStudents() {
+    setLoading(true);
+    setError(null);
     try {
       const q = search ? `?q=${encodeURIComponent(search)}` : '';
       const json = await apiGet(`/faculty/students${q}`);
-      setStudents(json.students || []);
-      setTotal(json.students ? json.students.length : 0);
+      const rows = Array.isArray(json?.students) ? json.students : [];
+      setStudents(rows);
+      setTotal(rows.length);
     } catch (err) {
-      setError('Failed to load students');
+      setError(err.message || 'Failed to load students');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function retry() {
+    await loadStudents();
   }
 
   async function addStudent(e) {
@@ -42,13 +49,13 @@ export default function StudentsManager() {
         username: username.trim(),
         name: name.trim(),
       });
-      if (json.ok) {
+      if (json && json.ok) {
         setUsername('');
         setName('');
         setFlash({ type: 'ok', msg: json.message });
-        loadStudents();
+        await loadStudents();
       } else {
-        setFlash({ type: 'err', msg: json.error });
+        setFlash({ type: 'err', msg: json && json.error ? json.error : 'Create failed' });
       }
     } catch (err) {
       setFlash({ type: 'err', msg: err.message || 'Create failed' });
@@ -62,11 +69,11 @@ export default function StudentsManager() {
     formData.append('file', file);
     try {
       const json = await apiFormPost('/faculty/students/import', formData);
-      if (json.ok) {
+      if (json && json.ok) {
         setFlash({ type: 'ok', msg: json.message });
-        loadStudents();
+        await loadStudents();
       } else {
-        setFlash({ type: 'err', msg: json.error });
+        setFlash({ type: 'err', msg: json && json.error ? json.error : 'Import failed' });
       }
     } catch (err) {
       setFlash({ type: 'err', msg: err.message || 'Import failed' });
@@ -77,11 +84,11 @@ export default function StudentsManager() {
     if (!confirm(`Reset the password of ${uname} to the username?`)) return;
     try {
       const json = await apiPost(`/faculty/students/${id}/reset`);
-      if (json.ok) {
+      if (json && json.ok) {
         setFlash({ type: 'ok', msg: json.message });
-        loadStudents();
+        await loadStudents();
       } else {
-        setFlash({ type: 'err', msg: json.error });
+        setFlash({ type: 'err', msg: json && json.error ? json.error : 'Reset failed' });
       }
     } catch (err) {
       setFlash({ type: 'err', msg: err.message || 'Reset failed' });
@@ -93,7 +100,7 @@ export default function StudentsManager() {
     try {
       await apiDelete(`/faculty/students/${id}`);
       setFlash({ type: 'ok', msg: 'Student deleted' });
-      loadStudents();
+      await loadStudents();
     } catch (err) {
       setFlash({ type: 'err', msg: err.message || 'Delete failed' });
     }
@@ -104,6 +111,36 @@ export default function StudentsManager() {
       {loading && <Loading />}
       {!loading && (
         <>
+        {error && (
+          <div
+            role="alert"
+            aria-live="polite"
+            style={{
+              ...style.flash,
+              ...style.flashErr,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{error}</span>
+            <button
+              onClick={retry}
+              style={{
+                background: 'transparent',
+                border: '1px solid currentColor',
+                color: 'currentColor',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '2px 8px',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
         <nav style={style.nav}>
           <span>Students</span>
           <span style={style.spacer}></span>
@@ -198,34 +235,35 @@ export default function StudentsManager() {
             </tr>
           </thead>
           <tbody>
-            {students.map((s) => (
-              <tr key={s.id}>
-                <td style={style.td}>{s.username}</td>
-                <td style={style.td}>{s.name}</td>
-                <td style={{ ...style.td, ...style.tdActions }}>
-                  <button
-                    type="button"
-                    onClick={() => resetPassword(s.id, s.username)}
-                    style={style.btnSmGray}
-                  >
-                    Reset password
-                  </button>{' '}
-                  <button
-                    type="button"
-                    onClick={() => deleteStudent(s.id, s.username)}
-                    style={style.btnSmRed}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {students.length === 0 && (
+            {students.length === 0 ? (
               <tr>
                 <td colSpan={3} style={style.mutedTd}>
                   No students yet. Create one above or import an Excel file.
                 </td>
               </tr>
+            ) : (
+              students.map((s) => (
+                <tr key={s.id}>
+                  <td style={style.td}>{s && s.username}</td>
+                  <td style={style.td}>{s && s.name}</td>
+                  <td style={{ ...style.td, ...style.tdActions }}>
+                    <button
+                      type="button"
+                      onClick={() => s && resetPassword(s.id, s.username)}
+                      style={style.btnSmGray}
+                    >
+                      Reset password
+                    </button>{' '}
+                    <button
+                      type="button"
+                      onClick={() => s && deleteStudent(s.id, s.username)}
+                      style={style.btnSmRed}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>

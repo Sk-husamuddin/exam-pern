@@ -5,7 +5,7 @@ import Loading from '../components/Loading.jsx';
 
 export default function StudentDashboard() {
   const [state, setState] = useState(null);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const POLL_MS = 3000;
@@ -26,13 +26,17 @@ export default function StudentDashboard() {
         return;
       }
       const json = await res.json();
-      setState(json);
-      setError('');
+      setState(json || {});
+      setError(null);
     } catch (err) {
       setError('Connection problem. Retrying automatically…');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function retry() {
+    await poll();
   }
 
   function sendLeaveSignal() {
@@ -62,7 +66,13 @@ export default function StudentDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!state || state.status !== 'live' || state.seconds_left == null || state.seconds_left <= 0) return;
+    if (
+      !state ||
+      state.status !== 'live' ||
+      state.seconds_left == null ||
+      state.seconds_left <= 0
+    )
+      return;
     const tick = setInterval(() => {
       setState((prev) => {
         if (!prev || prev.seconds_left == null || prev.seconds_left <= 0) return prev;
@@ -94,6 +104,35 @@ export default function StudentDashboard() {
       {loading && <Loading />}
       {!loading && (
         <>
+        {error && (
+          <div
+            role="alert"
+            aria-live="polite"
+            style={{
+              ...style.alert,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{error}</span>
+            <button
+              onClick={retry}
+              style={{
+                background: 'transparent',
+                border: '1px solid currentColor',
+                color: 'currentColor',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '2px 8px',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
         <nav style={style.nav}>
           <b>Exam Portal</b>
           <span style={style.spacer}></span>
@@ -123,7 +162,7 @@ export default function StudentDashboard() {
               <div style={style.stats}>
                 <div style={style.stat}>
                   <small>Status</small>
-                  <b style={style.badge(state.status)}>{state.status}</b>
+                  <b style={style.badge(state.status)}>{state.status || '-'}</b>
                 </div>
                 <div style={style.stat}>
                   <small>Time left</small>
@@ -131,7 +170,7 @@ export default function StudentDashboard() {
                 </div>
                 <div style={style.stat}>
                   <small>Violations</small>
-                  <b>{state.violations}/{state.max}</b>
+                  <b>{state.violations != null ? state.violations : 0}/{state.max != null ? state.max : '-'}</b>
                 </div>
               </div>
               <p id="note" className="muted" style={style.muted}>
@@ -148,9 +187,7 @@ export default function StudentDashboard() {
                   {btnText()}
                 </Link>
               ) : (
-                <span style={style.btnLink(false)}>
-                  {btnText()}
-                </span>
+                <span style={style.btnLink(false)}>{btnText()}</span>
               )}
             </>
           )}
@@ -164,7 +201,7 @@ export default function StudentDashboard() {
             <li>When you enter fullscreen, one question from this exam&rsquo;s faculty-created question list is assigned to you. If you re-enter, you keep the same question.</li>
             <li>The exam opens in <b>fullscreen</b>. Your question is shown only while you are in fullscreen.</li>
             <li>Do <b>not</b> switch tabs, open other windows, or leave fullscreen. Each time is recorded as a violation.</li>
-            <li>After <b>{state ? state.max : '?'}</b> violations your exam is locked and you must contact the faculty.</li>
+            <li>After <b>{state && state.max != null ? state.max : '?'}</b> violations your exam is locked and you must contact the faculty.</li>
             <li>Copy, paste, right-click and developer shortcuts are disabled.</li>
             <li>Logging in from another browser logs you out of the first one.</li>
           </ul>

@@ -20,12 +20,6 @@ export function FacultyAuth() { const [signup, setSignup] = useState(false); con
 
   const emailRedirectTo = window.location.origin + '/faculty/login';
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data?.session) window.location.href = '/faculty/dashboard';
-    });
-  }, []);
-
   const clearBanner = () => setBanner(null);
 
   const mapAuthError = (err) => {

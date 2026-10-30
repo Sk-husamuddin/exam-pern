@@ -360,7 +360,7 @@ export default function ExamScreen() {
     <div style={style.examRoot}>
       <header style={style.bar}>
         <div>
-          <b id="examTitle">{data?.title || 'Exam'}</b> &middot; Student
+          <b id="examTitle" data-testid="examTitle">{data?.title || 'Exam'}</b> &middot; Student
         </div>
         <div>
           <span id="viol" style={{ marginRight: 16 }}>
