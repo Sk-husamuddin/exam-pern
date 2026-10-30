@@ -10,9 +10,11 @@
  *  - env vars set: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
  */
 const config = require('../src/config');
+const { query } = require('../src/db');
 const BASE = 'http://127.0.0.1:5000';
 let pass = 0;
 let fail = 0;
+let cleanedUp = false;
 let facultyAuthUserId = null;
 let facultyAccessToken = null;
 let facultyProfileId = null;
@@ -22,6 +24,9 @@ let sessionToken = null;
 let freshJwt = null;
 let freshSessionToken = null;
 const TS = Date.now().toString(36); // unique suffix for usernames
+
+// Resources created during this run; removed in the finally block below.
+const createdAuthUserIds = [];
 
 function log(msg) {
   console.log(msg);
@@ -95,6 +100,7 @@ async function supabaseDeleteUser(uid) {
 }
 
 async function main() {
+  try {
   console.log('\n========================================');
   console.log('E2E TEST — Smart Exam Platform (PERN)');
   console.log('========================================\n');
@@ -132,10 +138,11 @@ async function main() {
       user_metadata: { role: 'faculty' },
     });
     facultyAuthUserId = created.id;
+    createdAuthUserIds.push(facultyAuthUserId);
     log(`  Created faculty auth user: ${facultyAuthUserId}`);
   } catch (e) {
     assert(false, 'Create faculty via Admin API', e.message);
-    return summarize();
+    return;
   }
 
   // Sign in via Supabase Auth to get access token
@@ -153,7 +160,7 @@ async function main() {
     assert(!!facultyAccessToken, 'Faculty sign-in (Supabase Auth)', `got token: ${!!facultyAccessToken}`);
   } catch (e) {
     assert(false, 'Faculty sign-in', e.message);
-    return summarize();
+    return;
   }
 
   // ------------------------------------------------------------------
@@ -723,27 +730,66 @@ async function main() {
   }
 
   // ------------------------------------------------------------------
-  // Cleanup
+  // Normal completion
   // ------------------------------------------------------------------
-  log('\nCleanup');
+  summarize();
+} finally {
+  await cleanup();
+  process.exit(fail > 0 ? 1 : 0);
+}
+}
+
+async function cleanup() {
+  if (cleanedUp) return;
+  cleanedUp = true;
+  log('\nCleanup (finally)');
   try {
-    await supabaseDeleteUser(facultyAuthUserId);
-    log('  Faculty auth user deleted from Supabase');
+    if (facultyProfileId) {
+      // exam_sessions and questions cascade from exams
+      await query('DELETE FROM exams WHERE faculty_id = $1', [facultyProfileId]);
+      log('  Deleted exam rows created by this faculty run');
+    }
+    await query(
+      `DELETE FROM profiles
+       WHERE role = 'student'
+       AND (username = $1 OR username = $2 OR username = $3 OR username LIKE $4)`,
+      [`E2ESTU${TS}`, `E2ESTUDENT${TS}`, `0012${TS}`, `DIST${TS}%`]
+    );
+    if (facultyProfileId) {
+      await query('DELETE FROM profiles WHERE id = $1 AND role = $2', [facultyProfileId, 'faculty']);
+      log('  Deleted faculty profile row');
+    }
   } catch (e) {
     log(`  Cleanup warning: ${e.message}`);
   }
-
-  summarize();
+  for (const id of createdAuthUserIds) {
+    try {
+      await supabaseDeleteUser(id);
+      log(`  Deleted auth user ${id}`);
+    } catch (e) {
+      log(`  Cleanup warning: delete auth user ${id}: ${e.message}`);
+    }
+  }
 }
 
 function summarize() {
   console.log('\n========================================');
   console.log(`RESULTS: ${pass} PASS, ${fail} FAIL`);
   console.log('========================================\n');
-  process.exit(fail > 0 ? 1 : 0);
 }
 
 main().catch((err) => {
   console.error('E2E fatal:', err.message);
-  summarize();
 });
+
+function shutdown(sig) {
+  console.log(`\nReceived ${sig}; cleaning up...`);
+  cleanup()
+    .then(() => process.exit(sig === 'SIGINT' ? 130 : 143))
+    .catch((err) => {
+      console.error('Cleanup error:', err.message);
+      process.exit(1);
+    });
+}
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
