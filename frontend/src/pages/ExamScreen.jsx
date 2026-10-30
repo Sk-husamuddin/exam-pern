@@ -1,14 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { API_BASE } from '../lib/supabase.js';
 import Loading from '../components/Loading.jsx';
 
 export default function ExamScreen() {
   const [data, setData] = useState(null);
+  const [warning, setWarning] = useState('');
   const [backendDown, setBackendDown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [armed, setArmed] = useState(false);
-  const [entered, setEntered] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [deadline, setDeadline] = useState(0);
+  const [examCode, setExamCode] = useState(() => localStorage.getItem('exam_student_code') || '');
+  const [entering, setEntering] = useState(false);
+  const [timeLeftStr, setTimeLeftStr] = useState('');
 
   const lastDataRef = useRef(null);
   const armedRef = useRef(false);
@@ -83,164 +88,85 @@ export default function ExamScreen() {
     return `${m}:${s}`;
   }
 
-  function showMessage(title, text, href, linkText) {
-    const main = document.getElementById('main');
-    if (!main) return;
-    main.innerHTML = '';
-    main.dataset.shown = '';
-    const h = document.createElement('h2');
-    h.textContent = title;
-    const p = document.createElement('p');
-    p.textContent = text || '';
-    main.append(h, p);
-    if (href) {
-      const a = document.createElement('a');
-      a.href = href;
-      a.className = 'btn';
-      a.textContent = linkText || 'Back';
-      a.style.display = 'inline-block';
-      a.style.textDecoration = 'none';
-      a.style.background = '#2b5cff';
-      a.style.color = '#fff';
-      a.style.padding = '8px 16px';
-      a.style.borderRadius = '6px';
-      a.style.marginTop = '12px';
-      main.append(a);
-    }
-  }
-
-  function render(d) {
+  function applyData(d) {
     if (!d || typeof d !== 'object') return;
     lastDataRef.current = d;
-    setData(d);
+    setData((prev) => ({
+      ...(prev || {}),
+      ...d,
+      entered: d.entered != null ? d.entered : (prev?.entered ?? false),
+      question: d.question != null ? d.question : prev?.question,
+      position: d.position != null ? d.position : prev?.position,
+    }));
     setBackendDown(false);
-
-    if (d.title) {
-      const titleEl = document.getElementById('examTitle');
-      if (titleEl) titleEl.textContent = d.title;
-    }
-
-    const violEl = document.getElementById('viol');
-    if (violEl && d.violations != null) {
-      violEl.textContent = `Violations: ${d.violations}/${d.max || 3}`;
-    }
 
     if (d.seconds_left != null && d.status === 'live') {
       setDeadline(Date.now() + d.seconds_left * 1000);
+      setTimeLeftStr(fmt(d.seconds_left));
     }
 
-    if (d.status === 'kicked') {
-      showMessage(
-        'Session expired',
-        'This student session is no longer active. Please sign in again.',
-        '/student/login',
-        'Login'
-      );
+    if (d.locked || d.status === 'ended' || d.status === 'kicked') {
       setArmed(false);
-      return;
     }
-    if (d.status === 'ended') {
-      showMessage(
-        'Exam ended',
-        'Thank you. Your exam has ended.',
-        '/student/dashboard',
-        'Back to dashboard'
-      );
-      setArmed(false);
-      return;
-    }
-    if (d.locked) {
-      showMessage(
-        'Exam locked',
-        'Your exam was locked because of too many violations. Please contact the faculty.'
-      );
-      setArmed(false);
-      return;
-    }
+  }
 
-    const isFullscreen = !!document.fullscreenElement;
-    const ready = !!d.entered && isFullscreen;
-    const fsOverlay = document.getElementById('fsOverlay');
-    if (fsOverlay) fsOverlay.style.display = ready ? 'none' : 'flex';
-
-    const main = document.getElementById('main');
-    if (!ready) {
-      if (main) {
-        main.innerHTML =
-          '<p class="muted">Exam is ready. Click “Enter fullscreen & show my question” to continue.</p>';
-        main.dataset.shown = '';
+  function sendLeaveSignal() {
+    const token = localStorage.getItem('exam_student_token');
+    if (!token) return;
+    try {
+      const url = `${API_BASE}/student/leave`;
+      if (navigator.sendBeacon) {
+        const blob = new Blob([JSON.stringify({ token })], { type: 'application/json' });
+        navigator.sendBeacon(url, blob);
+      } else {
+        fetch(url, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+          keepalive: true,
+        }).catch(() => {});
       }
-      return;
-    }
-
-    if (!d.question) {
-      showMessage(
-        'Question not available',
-        'No question has been assigned to this exam session. Please contact the faculty.'
-      );
-      return;
-    }
-
-    const key = String(d.position || '') + '|' + String(d.question);
-    if (main && main.dataset.shown !== key) {
-      main.innerHTML = '';
-      const h = document.createElement('h2');
-      h.textContent = `Question ${d.position || ''}`;
-      const q = document.createElement('div');
-      q.className = 'question';
-      q.style.whiteSpace = 'pre-wrap';
-      q.style.fontSize = '18px';
-      q.style.lineHeight = '1.65';
-      q.style.background = '#fff';
-      q.style.padding = '24px';
-      q.style.borderRadius = '10px';
-      q.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)';
-      q.textContent = d.question;
-      main.append(h, q);
-      main.dataset.shown = key;
-    }
+    } catch (_) {}
   }
 
   async function fetchState() {
     try {
       const healthy = await checkBackendHealth();
       if (!healthy) {
-        const warn = document.getElementById('warn');
-        if (warn) {
-          warn.textContent = 'Connection problem: Backend server is not reachable on port 5000.';
-          warn.style.display = 'block';
-        }
+        setWarning('Connection problem: Backend server is not reachable on port 5000.');
         return;
       }
       setBackendDown(false);
 
-      const d = await getJson(`${API_BASE}/student/state`, {
+      const isActive =
+        !document.hidden &&
+        !!document.fullscreenElement &&
+        document.hasFocus() &&
+        !!dataRef.current?.entered &&
+        !dataRef.current?.locked &&
+        dataRef.current?.status === 'live';
+
+      const d = await getJson(`${API_BASE}/student/state?active=${isActive ? '1' : '0'}`, {
         cache: 'no-store',
         headers: await sessionAuthHeaders(),
       });
-      render(d);
+      applyData(d);
     } catch (e) {
-      const warn = document.getElementById('warn');
-      if (warn) {
-        warn.textContent = 'Connection problem: ' + (e.message || 'Unable to contact server.') + ' Retrying automatically…';
-        warn.style.display = 'block';
-      }
+      setWarning('Connection problem: ' + (e.message || 'Unable to contact server.') + ' Retrying automatically…');
     } finally {
       setLoading(false);
     }
   }
 
   async function recordViolation(reason) {
-    if (!armedRef.current) return;
+    // If not armed or already locked, do not record further violations
+    if (!armedRef.current || dataRef.current?.locked) return;
+
     const now = Date.now();
     if (now - lastVRef.current < 1500) return;
     lastVRef.current = now;
 
-    const warn = document.getElementById('warn');
-    if (warn) {
-      warn.textContent = 'Warning: ' + reason + ' has been recorded.';
-      warn.style.display = 'block';
-    }
+    setWarning(`Warning: ${reason} has been recorded.`);
 
     try {
       const headers = await sessionAuthHeaders();
@@ -250,13 +176,14 @@ export default function ExamScreen() {
         headers,
         body: JSON.stringify({ reason }),
       });
-      render(updated);
+      applyData(updated);
     } catch (_) {}
   }
 
   async function enterFullscreen() {
-    const btn = document.getElementById('fsBtn');
-    if (btn) btn.disabled = true;
+    if (entering || data?.locked) return;
+    setEntering(true);
+    setWarning('');
 
     try {
       try {
@@ -267,10 +194,9 @@ export default function ExamScreen() {
         console.warn('Fullscreen request rejected or not supported:', fsErr);
       }
 
-      const examCodeInput = document.getElementById('examCodeInput');
-      const examCode = examCodeInput ? examCodeInput.value.trim().toUpperCase() : '';
-      if (examCode) {
-        localStorage.setItem('exam_student_code', examCode);
+      const code = (examCode || '').trim().toUpperCase();
+      if (code) {
+        localStorage.setItem('exam_student_code', code);
       }
 
       const headers = await jwtAuthHeaders();
@@ -280,7 +206,7 @@ export default function ExamScreen() {
       const enterRes = await getJson(`${API_BASE}/student/enter`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ exam_code: examCode }),
+        body: JSON.stringify({ exam_code: code }),
       });
 
       if (enterRes.session_token) {
@@ -288,11 +214,7 @@ export default function ExamScreen() {
       }
 
       if (enterRes.notice) {
-        const warn = document.getElementById('warn');
-        if (warn) {
-          warn.textContent = enterRes.notice;
-          warn.style.display = 'block';
-        }
+        setWarning(enterRes.notice);
       }
 
       // 2. Immediately fetch the assigned question body and full state
@@ -302,35 +224,38 @@ export default function ExamScreen() {
         headers: stateHeaders,
       });
 
-      render(fullState);
-      setArmed(true);
-      setEntered(true);
-    } catch (e) {
-      const warn = document.getElementById('warn');
-      if (warn) {
-        warn.textContent = 'Unable to enter exam: ' + (e.message || 'Please try again.');
-        warn.style.display = 'block';
+      applyData(fullState);
+      if (!fullState.locked) {
+        setArmed(true);
       }
+    } catch (e) {
+      setWarning('Unable to enter exam: ' + (e.message || 'Please try again.'));
     } finally {
-      if (btn) btn.disabled = false;
+      setEntering(false);
     }
   }
 
   // Set up event listeners once on mount
   useEffect(() => {
     function handleVisibility() {
-      if (document.hidden) recordViolation('Tab switch');
+      if (document.hidden) {
+        sendLeaveSignal();
+        recordViolation('Tab switch');
+      }
     }
 
     function handleBlur() {
+      sendLeaveSignal();
       recordViolation('Window lost focus');
     }
 
     function handleFullscreenChange() {
-      if (!document.fullscreenElement) {
+      const isFs = !!document.fullscreenElement;
+      setIsFullscreen(isFs);
+      if (!isFs) {
+        sendLeaveSignal();
         recordViolation('Left fullscreen');
       }
-      if (lastDataRef.current) render(lastDataRef.current);
     }
 
     function handleKeyDown(e) {
@@ -353,10 +278,15 @@ export default function ExamScreen() {
     }
 
     function handleBeforeUnload(e) {
-      if (dataRef.current && dataRef.current.status === 'live') {
+      sendLeaveSignal();
+      if (dataRef.current && dataRef.current.status === 'live' && !dataRef.current.locked) {
         e.preventDefault();
         e.returnValue = '';
       }
+    }
+
+    function handlePageHide() {
+      sendLeaveSignal();
     }
 
     document.addEventListener('visibilitychange', handleVisibility);
@@ -367,18 +297,21 @@ export default function ExamScreen() {
     const blocked = ['contextmenu', 'copy', 'cut', 'paste', 'selectstart', 'dragstart'];
     blocked.forEach((ev) => document.addEventListener(ev, blockEvent));
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
+      sendLeaveSignal();
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('keydown', handleKeyDown);
       blocked.forEach((ev) => document.removeEventListener(ev, blockEvent));
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
     };
   }, []);
 
-  // Polling loop (separate from data re-renders)
+  // Polling loop
   useEffect(() => {
     let active = true;
 
@@ -398,28 +331,44 @@ export default function ExamScreen() {
     };
   }, []);
 
-  // Client-side smooth countdown timer
+  // Countdown timer
   useEffect(() => {
-    if (!deadline || !data || data.status !== 'live') return;
+    if (!deadline || !data || data.status !== 'live' || data.locked) return;
     const timerId = setInterval(() => {
       const left = Math.round((deadline - Date.now()) / 1000);
-      const el = document.getElementById('timer');
-      if (el) el.textContent = fmt(Math.max(0, left));
+      setTimeLeftStr(fmt(Math.max(0, left)));
     }, 500);
     return () => clearInterval(timerId);
-  }, [deadline, data?.status]);
+  }, [deadline, data?.status, data?.locked]);
 
-  const defaultExamCode = localStorage.getItem('exam_student_code') || '';
+  // The overlay is shown ONLY if the exam is NOT locked and student has not entered or is not in fullscreen
+  const showOverlay =
+    !loading &&
+    data &&
+    data.status === 'live' &&
+    !data.locked &&
+    (!data.entered || !isFullscreen);
+
+  const readyToShowQuestion =
+    data &&
+    data.status === 'live' &&
+    !data.locked &&
+    data.entered &&
+    isFullscreen;
 
   return (
     <div style={style.examRoot}>
       <header style={style.bar}>
         <div>
-          <b id="examTitle">Exam</b> &middot; Student
+          <b id="examTitle">{data?.title || 'Exam'}</b> &middot; Student
         </div>
         <div>
-          <span id="viol" style={{ marginRight: 16 }}></span>
-          <span id="timer" className="timer" style={style.timer}></span>
+          <span id="viol" style={{ marginRight: 16 }}>
+            {data && data.violations != null ? `Violations: ${data.violations}/${data.max || 3}` : ''}
+          </span>
+          <span id="timer" className="timer" style={style.timer}>
+            {timeLeftStr}
+          </span>
         </div>
       </header>
 
@@ -431,35 +380,89 @@ export default function ExamScreen() {
 
       {loading && <Loading message="Connecting to exam server…" />}
 
-      <div id="warn" className="alert" style={{ ...style.alert, display: 'none' }}></div>
-
-      <main id="main" style={style.main}>
-        <p className="muted" style={style.muted}>
-          Connecting to the exam server… If this message remains, check the database configuration and browser network errors.
-        </p>
-      </main>
-
-      <div id="fsOverlay" className="overlay" style={{ ...style.overlay, display: 'flex' }}>
-        <div style={style.overlayCard}>
-          <h2>Start your exam</h2>
-          <p>
-            The exam is live. Click below to go fullscreen. One question from the faculty question list for this exam is
-            assigned to you and shown. Switching tabs or leaving fullscreen is recorded as a violation.
-          </p>
-          <input
-            id="examCodeInput"
-            type="text"
-            placeholder="Exam code"
-            defaultValue={defaultExamCode}
-            style={style.input}
-            maxLength="10"
-          />
-          <br />
-          <button className="btn" id="fsBtn" onClick={enterFullscreen} style={style.btn}>
-            Enter fullscreen & show my question
-          </button>
+      {warning && (
+        <div id="warn" className="alert" style={style.alert}>
+          {warning}
         </div>
-      </div>
+      )}
+
+      {/* Main content display based on exam state */}
+      {!loading && data && (
+        <main id="main" style={style.main}>
+          {data.locked ? (
+            <div style={style.card}>
+              <h2 style={{ color: '#b91c1c', marginTop: 0 }}>Exam locked</h2>
+              <p style={{ fontSize: 16, lineHeight: 1.6, color: '#374151' }}>
+                Your exam was locked because of too many violations (<b>{data.violations}/{data.max || 3}</b>). Please contact the faculty to unlock your exam.
+              </p>
+              <Link to="/student/dashboard" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
+                Back to dashboard
+              </Link>
+            </div>
+          ) : data.status === 'ended' ? (
+            <div style={style.card}>
+              <h2 style={{ marginTop: 0 }}>Exam ended</h2>
+              <p style={{ fontSize: 16, color: '#374151' }}>Thank you. Your exam has ended.</p>
+              <Link to="/student/dashboard" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
+                Back to dashboard
+              </Link>
+            </div>
+          ) : data.status === 'kicked' ? (
+            <div style={style.card}>
+              <h2 style={{ marginTop: 0 }}>Session expired</h2>
+              <p style={{ fontSize: 16, color: '#374151' }}>This student session is no longer active. Please sign in again.</p>
+              <Link to="/student/login" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
+                Login
+              </Link>
+            </div>
+          ) : readyToShowQuestion ? (
+            <div>
+              <h2 style={{ marginBottom: 16 }}>Question {data.position || ''}</h2>
+              <div style={style.question}>
+                {data.question || 'No question has been assigned yet. Please contact faculty.'}
+              </div>
+            </div>
+          ) : (
+            <div style={style.card}>
+              <p style={{ color: '#4b5563', margin: 0, fontSize: 15 }}>
+                Exam is ready. Please click &ldquo;Enter fullscreen &amp; show my question&rdquo; below to view your question.
+              </p>
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* Fullscreen Entry Modal: NEVER shown if exam is locked */}
+      {showOverlay && (
+        <div id="fsOverlay" className="overlay" style={style.overlay}>
+          <div style={style.overlayCard}>
+            <h2 style={{ marginTop: 0 }}>Start your exam</h2>
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: '#e5e7eb' }}>
+              The exam is live. Click below to go fullscreen. One question from the faculty question list for this exam is
+              assigned to you and shown. Switching tabs or leaving fullscreen is recorded as a violation.
+            </p>
+            <input
+              id="examCodeInput"
+              type="text"
+              placeholder="Exam code"
+              value={examCode}
+              onChange={(e) => setExamCode(e.target.value.toUpperCase())}
+              style={style.input}
+              maxLength="10"
+            />
+            <br />
+            <button
+              className="btn"
+              id="fsBtn"
+              onClick={enterFullscreen}
+              disabled={entering}
+              style={style.btn}
+            >
+              {entering ? 'Entering…' : 'Enter fullscreen & show my question'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .exam { user-select: none; -webkit-user-select: none }
@@ -478,26 +481,46 @@ const style = {
   timer: { fontSize: 20, fontWeight: 'bold' },
   main: { maxWidth: 900, margin: '30px auto', padding: '0 20px' },
   muted: { color: '#6b7280' },
+  card: {
+    background: '#fff', borderRadius: 10, padding: 28,
+    boxShadow: '0 2px 10px rgba(0,0,0,.08)',
+  },
+  question: {
+    whiteSpace: 'pre-wrap', fontSize: 18, lineHeight: 1.65,
+    background: '#fff', padding: 24, borderRadius: 10,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+  },
+  btnPrimaryLink: {
+    display: 'inline-block',
+    background: '#2b5cff',
+    color: '#fff',
+    padding: '9px 18px',
+    borderRadius: 6,
+    textDecoration: 'none',
+    fontSize: 14,
+    fontWeight: 600,
+    marginTop: 14,
+  },
   overlay: {
     position: 'fixed', inset: 0, background: 'rgba(20,25,40,.92)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 99, textAlign: 'center', color: '#fff', fontFamily: 'system-ui, sans-serif',
   },
-  overlayCard: { maxWidth: 420, background: 'rgba(255,255,255,.06)', padding: 24, borderRadius: 10 },
+  overlayCard: { maxWidth: 420, background: 'rgba(255,255,255,.08)', padding: 28, borderRadius: 12 },
   input: {
-    width: '100%', padding: 9, border: 'none', borderRadius: 6, margin: '10px 0', fontSize: 14,
-    boxSizing: 'border-box',
+    width: '100%', padding: 10, border: 'none', borderRadius: 6, margin: '12px 0', fontSize: 15,
+    boxSizing: 'border-box', textAlign: 'center', letterSpacing: 2, fontWeight: 'bold',
   },
   btn: {
-    background: '#2b5cff', color: '#fff', border: 'none', padding: '9px 16px',
-    borderRadius: 6, cursor: 'pointer', fontSize: 14, marginTop: 10,
+    background: '#2b5cff', color: '#fff', border: 'none', padding: '10px 18px',
+    borderRadius: 6, cursor: 'pointer', fontSize: 14, marginTop: 10, fontWeight: 600,
   },
   alert: {
     background: '#fde8e8', color: '#9b1c1c', padding: '10px 14px',
-    borderRadius: 6, margin: '10px 20px', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
+    borderRadius: 6, margin: '14px 20px 0', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
   },
   alertErr: {
     background: '#fde8e8', color: '#9b1c1c', padding: '10px 14px',
-    borderRadius: 6, margin: '10px 20px', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
+    borderRadius: 6, margin: '14px 20px 0', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
   },
 };

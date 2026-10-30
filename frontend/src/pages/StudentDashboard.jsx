@@ -35,7 +35,27 @@ export default function StudentDashboard() {
     }
   }
 
+  function sendLeaveSignal() {
+    const token = localStorage.getItem('exam_student_token');
+    if (!token) return;
+    try {
+      const url = `${API_BASE}/student/leave`;
+      if (navigator.sendBeacon) {
+        const blob = new Blob([JSON.stringify({ token })], { type: 'application/json' });
+        navigator.sendBeacon(url, blob);
+      } else {
+        fetch(url, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch (_) {}
+  }
+
   useEffect(() => {
+    sendLeaveSignal();
     poll();
     const id = setInterval(poll, POLL_MS);
     return () => clearInterval(id);
@@ -80,6 +100,7 @@ export default function StudentDashboard() {
           <span>Student Dashboard</span>
           <button
             onClick={() => {
+              sendLeaveSignal();
               localStorage.removeItem('exam_student_token');
               localStorage.removeItem('exam_student_jwt');
               localStorage.removeItem('exam_student_user');

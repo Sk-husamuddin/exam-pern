@@ -190,12 +190,28 @@ router.get('/state', verifyStudentSession, async (req, res) => {
       }
     }
 
-    // Update last_seen so the monitor shows the student as online
-    await query('UPDATE exam_sessions SET last_seen = now() WHERE id = $1', [s.id]);
+    // Only update last_seen when the student is actively taking the exam (in fullscreen, tab visible, not locked)
+    const isActive = req.query.active === '1' && !s.locked && !!s.q_id && status === 'live';
+    if (isActive) {
+      await query('UPDATE exam_sessions SET last_seen = now() WHERE id = $1', [s.id]);
+    }
 
     res.json(out);
   } catch (err) {
     console.error('GET /state error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ------------------------------------------------------------------
+// Explicit leave / offline signal (called on beforeunload, pagehide, blur, tab switch)
+// ------------------------------------------------------------------
+router.post('/leave', verifyStudentSession, async (req, res) => {
+  try {
+    await query("UPDATE exam_sessions SET last_seen = now() - interval '1 minute' WHERE id = $1", [req.student.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /leave error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -228,6 +244,12 @@ router.post('/violation', verifyStudentSession, async (req, res) => {
           [newViolations, newLocked, s.id]
         );
         await query('INSERT INTO violation_log (session_id, reason) VALUES ($1, $2)', [s.id, reason]);
+
+        // If the student left fullscreen, switched tabs, blurred, or got locked, immediately mark last_seen in the past
+        if (newLocked === 1 || reason.includes('fullscreen') || reason.includes('Tab') || reason.includes('focus')) {
+          await query("UPDATE exam_sessions SET last_seen = now() - interval '1 minute' WHERE id = $1", [s.id]);
+        }
+
         await query('COMMIT');
       } catch (err) {
         await query('ROLLBACK');

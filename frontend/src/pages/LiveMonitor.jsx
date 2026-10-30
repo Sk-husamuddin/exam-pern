@@ -70,6 +70,55 @@ export default function LiveMonitor() {
     }
   }
 
+  function downloadCsv() {
+    if (!students || students.length === 0) {
+      alert('No students have logged in to this exam yet.');
+      return;
+    }
+
+    const headers = [
+      'Roll Number',
+      'Student Name',
+      'Question No',
+      'Assigned Question',
+      'Violations',
+      'Status',
+      'Login Time',
+    ];
+
+    const escapeCsv = (val) => {
+      const str = String(val == null ? '' : val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = students.map((s) => [
+      s.username,
+      s.name,
+      s.position ? `Q${s.position}` : 'Not Entered',
+      s.question_text || (s.position ? `Question ${s.position}` : 'Not Entered'),
+      s.violations,
+      s.locked ? 'Locked' : s.online ? 'Online' : 'Offline',
+      s.login_time || '',
+    ]);
+
+    const csvContent =
+      '\uFEFF' +
+      [headers.map(escapeCsv).join(','), ...rows.map((r) => r.map(escapeCsv).join(','))].join(
+        '\r\n'
+      );
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeTitle = (exam.title || 'exam').replace(/[^a-zA-Z0-9_-]/g, '_');
+    link.download = `${safeTitle}_assigned_questions.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   const fmt = (sec) => {
     if (sec == null) return '-';
     sec = Math.max(0, Number(sec) || 0);
@@ -113,6 +162,15 @@ export default function LiveMonitor() {
             {exam.status === 'live' && (
               <button onClick={() => act('end')} style={style.btnSmRed}>End exam</button>
             )}
+            {exam.status !== 'draft' && (
+              <button
+                onClick={downloadCsv}
+                style={style.btnSmExport}
+                title="Download CSV of student roll numbers and assigned questions"
+              >
+                📥 Download CSV
+              </button>
+            )}
             <Link to={`/faculty/questions/${examId}`}>
               <button style={style.btnSm}>Questions</button>
             </Link>
@@ -121,6 +179,21 @@ export default function LiveMonitor() {
       </div>
 
       {error && <div style={style.alertErr}>{error}</div>}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 16 }}>
+        <h3 style={{ margin: 0, fontSize: 16 }}>
+          Students ({students.length})
+        </h3>
+        {exam.status !== 'draft' && students.length > 0 && (
+          <button
+            onClick={downloadCsv}
+            style={style.btnSmExport}
+            title="Download CSV of student roll numbers and assigned questions"
+          >
+            📥 Download CSV
+          </button>
+        )}
+      </div>
 
       <table style={style.table}>
         <thead>
@@ -208,5 +281,6 @@ const style = {
   btnSm: { background: '#2b5cff', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginRight: 6 },
   btnSmGreen: { background: '#1a8f4a', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginRight: 6 },
   btnSmRed: { background: '#d33', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13 },
+  btnSmExport: { background: '#0284c7', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginRight: 6, fontWeight: 500 },
   alertErr: { background: '#fde8e8', color: '#9b1c1c', padding: 10, borderRadius: 6, marginBottom: 12 },
 };

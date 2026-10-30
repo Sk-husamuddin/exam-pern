@@ -509,7 +509,7 @@ router.post('/students/import', verifyFaculty, uploadStudent.single('file'), asy
     let rows;
 
     if (ext === 'xlsx') {
-      rows = parseXlsx(req.file.buffer);
+      rows = await parseXlsx(req.file.buffer);
     } else if (ext === 'csv') {
       rows = parseCsv(req.file.buffer);
     } else {
@@ -709,11 +709,11 @@ router.get('/state', verifyFaculty, async (req, res) => {
     const totalQ = await query('SELECT COUNT(*) FROM questions WHERE exam_id = $1', [exam_id]);
     const total = parseInt(totalQ.rows[0].count, 10);
 
-    const ONLINE_SEC = 20; // (3+3)*2+5 from original, increased for more lenient online detection
+    const ONLINE_SEC = 8; // 8 seconds threshold for 3s polling heartbeat
     const rows = await query(
       `SELECT s.id AS sid, p.username, p.name, s.login_order, s.login_time, s.violations, s.locked,
-              q.q_no AS position,
-              (EXTRACT(EPOCH FROM (now() - s.last_seen)) < $2) AS online,
+              q.q_no AS position, q.body AS question_text,
+              (s.q_id IS NOT NULL AND (EXTRACT(EPOCH FROM (now() - s.last_seen)) < $2) AND NOT s.locked) AS online,
               (SELECT reason FROM violation_log v WHERE v.session_id = s.id ORDER BY v.id DESC LIMIT 1) AS last_reason
        FROM exam_sessions s
        JOIN profiles p ON p.id = s.user_id
@@ -732,6 +732,7 @@ router.get('/state', verifyFaculty, async (req, res) => {
       violations: parseInt(r.violations, 10),
       locked: !!r.locked,
       position: r.position != null ? parseInt(r.position, 10) : 0,
+      question_text: r.question_text || '',
       online: !!r.online,
       last_reason: r.last_reason || '',
     }));
@@ -751,55 +752,103 @@ router.get('/state', verifyFaculty, async (req, res) => {
   }
 });
 
+// ------------------------------------------------------------------
+// Export roll numbers and assigned questions as CSV
+// ------------------------------------------------------------------
+router.get('/exams/:examId/export-assignments', verifyFaculty, async (req, res) => {
+  try {
+    const { examId } = req.params;
+    const exam = await query('SELECT * FROM exams WHERE id = $1 AND faculty_id = $2', [examId, req.faculty.id]);
+    if (exam.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
+
+    const { rows } = await query(
+      `SELECT p.username, p.name, q.q_no AS position, q.body AS question_text,
+              s.login_time, s.violations, s.locked
+       FROM exam_sessions s
+       JOIN profiles p ON p.id = s.user_id
+       LEFT JOIN questions q ON q.id = s.q_id
+       WHERE s.exam_id = $1
+       ORDER BY s.login_order`,
+      [examId]
+    );
+
+    const headers = ['Roll Number', 'Student Name', 'Question No', 'Assigned Question', 'Violations', 'Status', 'Login Time'];
+    const escapeCsv = (val) => {
+      const str = String(val == null ? '' : val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const csvLines = [headers.map(escapeCsv).join(',')];
+    for (const r of rows) {
+      csvLines.push([
+        r.username,
+        r.name,
+        r.position ? `Q${r.position}` : 'Not Assigned',
+        r.question_text || 'Not Assigned',
+        r.violations,
+        r.locked ? 'Locked' : 'Active',
+        r.login_time ? new Date(r.login_time).toLocaleString() : '',
+      ].map(escapeCsv).join(','));
+    }
+
+    const csvContent = '\uFEFF' + csvLines.join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="exam_${examId}_assignments.csv"`);
+    res.send(csvContent);
+  } catch (err) {
+    console.error('GET /exams/:examId/export-assignments error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ---------- helpers for file parsing ----------
 
 function parseXlsx(buffer) {
   const JSZip = require('jszip');
-  const zip = new JSZip();
-  const shared = [];
 
-  return zip.loadAsync(buffer).then((z) => {
-      return z.file('xl/sharedStrings.xml')?.async('string').then((ss) => {
-        // Simple shared string extraction
-        const siRegex = /<si[^>]*>([\s\S]*?)<\/si>/g;
-        let m;
-        while ((m = siRegex.exec(ss)) !== null) {
-          const t = m[1].match(/<t[^>]*>([\s\S]*?)<\/t>/);
-          shared.push(t ? t[1] : '');
-        }
-        return z;
-      }).then((z) => {
-        // Find first worksheet
-        let sheetXml = null;
-        for (let i = 1; i <= 50; i++) {
-          const file = z.file(`xl/worksheets/sheet${i}.xml`);
-          if (file) { sheetXml = file; break; }
-        }
-        if (!sheetXml) return [];
-        return sheetXml.async('string');
-      }).then((xml) => {
-        if (!xml) return [];
-        const rows = [];
-        const rowRegex = /<row[^>]*>([\s\S]*?)<\/row>/g;
-        let rowMatch;
-        while ((rowMatch = rowRegex.exec(xml)) !== null) {
-          const rowContent = rowMatch[1];
-          const cells = [];
-          const cRegex = /<c[^>]*r="([A-Z]+[0-9]+)"[^>]*t="([^"]*)"[^>]*>([\s\S]*?)<\/c>|<c[^>]*r="([A-Z]+[0-9]+)"[^>]*>([\s\S]*?)<\/c>/g;
-          let cMatch;
-          while ((cMatch = cRegex.exec(rowContent)) !== null) {
-            const colLetters = cMatch[1] || cMatch[4];
-            let t = cMatch[2] === 's' ? shared[parseInt(cMatch[3].match(/<v>([\s\S]*?)<\/v>/)?.[1] || '0', 10) || ''] : '';
-            if (!t) t = cMatch[5].match(/<v>([\s\S]*?)<\/v>/)?.[1] || '';
-            cells.push(String(t));
-          }
-          rows.push(cells);
-        }
-        return rows;
-      });
-    }).catch((err) => {
-      return Promise.resolve([]);
-    });
+  return JSZip.loadAsync(buffer).then(async (z) => {
+    const shared = [];
+
+    // Parse shared strings if present
+    const ssFile = z.file('xl/sharedStrings.xml');
+    if (ssFile) {
+      const ss = await ssFile.async('string');
+      const siRegex = /<si[^>]*>([\s\S]*?)<\/si>/g;
+      let m;
+      while ((m = siRegex.exec(ss)) !== null) {
+        const t = m[1].match(/<t[^>]*>([\s\S]*?)<\/t>/);
+        shared.push(t ? t[1] : '');
+      }
+    }
+
+    // Find first worksheet
+    let sheetXml = null;
+    for (let i = 1; i <= 50; i++) {
+      const file = z.file(`xl/worksheets/sheet${i}.xml`);
+      if (file) { sheetXml = file; break; }
+    }
+    if (!sheetXml) return [];
+
+    const xml = await sheetXml.async('string');
+    if (!xml) return [];
+
+    const rows = [];
+    const rowRegex = /<row[^>]*>([\s\S]*?)<\/row>/g;
+    let rowMatch;
+    while ((rowMatch = rowRegex.exec(xml)) !== null) {
+      const rowContent = rowMatch[1];
+      const cells = [];
+      const cRegex = /<c[^>]*r="([A-Z]+[0-9]+)"[^>]*t="([^"]*)"[^>]*>([\s\S]*?)<\/c>|<c[^>]*r="([A-Z]+[0-9]+)"[^>]*>([\s\S]*?)<\/c>/g;
+      let cMatch;
+      while ((cMatch = cRegex.exec(rowContent)) !== null) {
+        let t = cMatch[2] === 's' ? (shared[parseInt(cMatch[3].match(/<v>([\s\S]*?)<\/v>/)?.[1] || '0', 10)] || '') : '';
+        if (!t) t = (cMatch[5] || '').match(/<v>([\s\S]*?)<\/v>/)?.[1] || '';
+        cells.push(String(t));
+      }
+      rows.push(cells);
+    }
+    return rows;
+  }).catch(() => []);
 }
 
 function parseCsv(buffer) {
