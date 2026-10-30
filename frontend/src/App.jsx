@@ -1,119 +1,13 @@
-import { useState, useEffect } from 'react';
-import {
-  createBrowserRouter,
-  RouterProvider,
-  Navigate,
-  Outlet,
-} from 'react-router-dom';
-import { supabase } from './lib/supabase.js';
-
-import FacultyLogin from './pages/FacultyLogin.jsx';
-import FacultyDashboard from './pages/FacultyDashboard.jsx';
-import QuestionsEditor from './pages/QuestionsEditor.jsx';
-import StudentsManager from './pages/StudentsManager.jsx';
-import LiveMonitor from './pages/LiveMonitor.jsx';
-import StudentLogin from './pages/StudentLogin.jsx';
-import StudentDashboard from './pages/StudentDashboard.jsx';
-import ExamScreen from './pages/ExamScreen.jsx';
-
-function FacultyLayout({ children }) {
-  const [ready, setReady] = useState(false);
-  const [ok, setOk] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (mounted) {
-        setReady(true);
-        setOk(!!data.session);
-      }
-    })();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) {
-        setReady(true);
-        setOk(!!session);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription?.unsubscribe();
-    };
-  }, []);
-
-  if (!ready) return null;
-  if (!ok) return <Navigate to="/faculty/login" replace />;
-  return <>{children}</>;
-}
-
-function StudentLayout({ children }) {
-  const [ready, setReady] = useState(false);
-  const [ok, setOk] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    const token = localStorage.getItem('exam_student_token') || localStorage.getItem('exam_student_jwt');
-    if (mounted) {
-      setReady(true);
-      setOk(!!token);
-    }
-    return () => { mounted = false; };
-  }, []);
-
-  if (!ready) return null;
-  if (!ok) return <Navigate to="/student/login" replace />;
-  return <>{children}</>;
-}
-
-const facultyRoutes = [
-  { index: true, element: <Navigate to="/faculty/dashboard" replace /> },
-  { path: 'dashboard', element: <FacultyDashboard /> },
-  { path: 'questions/:examId', element: <QuestionsEditor /> },
-  { path: 'students', element: <StudentsManager /> },
-  { path: 'monitor/:examId', element: <LiveMonitor /> },
-];
-
-const studentRoutes = [
-  { index: true, element: <Navigate to="/student/dashboard" replace /> },
-  { path: 'dashboard', element: <StudentDashboard /> },
-  { path: 'exam', element: <ExamScreen /> },
-];
-
-const router = createBrowserRouter(
-  [
-    {
-      path: '/faculty/login',
-      element: <FacultyLogin />,
-    },
-    {
-      path: '/faculty',
-      element: <FacultyLayout><Outlet /></FacultyLayout>,
-      children: facultyRoutes,
-    },
-    {
-      path: '/student/login',
-      element: <StudentLogin />,
-    },
-    {
-      path: '/student',
-      element: <StudentLayout><Outlet /></StudentLayout>,
-      children: studentRoutes,
-    },
-    {
-      path: '/',
-      element: <Navigate to="/faculty/login" replace />,
-    },
-  ],
-  {
-    future: {
-      v7_startTransition: true,
-      v7_relativeSplatPath: true,
-    },
-  }
-);
+import { useState } from 'react';
+import { LandingPage, FacultyAuth, StudentAuth, StatusPage } from './pages/PlatformScreens.jsx';
+import { LoadingScreen } from './components/ui.jsx';
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  const [screen] = useState(() => window.location.pathname);
+  if (screen === '/') return <LandingPage />;
+  if (screen === '/faculty/login') return <FacultyAuth />;
+  if (screen === '/student/login') return <StudentAuth />;
+  if (screen === '/session-expired') return <StatusPage type="expired" />;
+  if (screen === '/loading') return <LoadingScreen />;
+  return <StatusPage />;
 }
