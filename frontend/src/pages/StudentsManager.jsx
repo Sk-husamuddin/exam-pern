@@ -103,117 +103,119 @@ export default function StudentsManager() {
     <div style={style.page}>
       {loading && <Loading />}
       {!loading && (
-      <nav style={style.nav}>
-        <span>Students</span>
-        <span style={style.spacer}></span>
-        <a href="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</a>
-      </nav>
+        <>
+        <nav style={style.nav}>
+          <span>Students</span>
+          <span style={style.spacer}></span>
+          <a href="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</a>
+        </nav>
 
-      {flash && (
-        <div style={{ ...style.flash, ...(flash.type === 'ok' ? style.flashOk : style.flashErr) }}>{flash.msg}</div>
-      )}
-
-      <p style={style.muted}>
-        Every student&apos;s <b>password is the same as the username</b> (roll number). Students log in with the username, that password, and the exam code.
-      </p>
-
-      <div style={style.row}>
-        <div style={style.card}>
-          <h3 style={{ marginTop: 0 }}>1. Create manually</h3>
-          <form onSubmit={addStudent} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <label style={style.label}>Username (roll number)</label>
-            <input
-              style={style.input}
-              name="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="e.g. 21CS001"
-              required
-              maxLength="50"
-            />
-            <label style={style.label}>Full name</label>
-            <input
-              style={style.input}
-              name="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Ravi Kumar"
-              maxLength="100"
-            />
-            <button type="submit" style={style.btnPrimary}>Create student</button>
-          </form>
-        </div>
-
-        <div style={style.card}>
-          <h3 style={{ marginTop: 0 }}>2. Import from Excel</h3>
-          <p style={style.muted}>
-            File (.xlsx or .csv): <b>Column A = username</b>, <b>Column B = full name</b>. A header row is allowed.{' '}
-            <a href="#" style={style.link}>Download sample file</a>
-          </p>
-          <form onSubmit={importStudents} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <label style={style.label}>Excel / CSV file</label>
-            <input
-              type="file"
-              name="file"
-              accept=".xlsx,.csv"
-              required
-              onChange={(e) => setFile(e.target.files[0])}
-            />
-            <button type="submit" style={style.btnPrimary}>Import students</button>
-          </form>
-          <p style={style.muted}>
-            Tip: format column A as <b>Text</b> in Excel so roll numbers like 0012 keep their zeros. Max 1000 students per file.
-          </p>
-        </div>
-      </div>
-
-      <h3 style={style.h3}>Students ({total})</h3>
-      <form style={style.searchForm} onSubmit={(e) => e.preventDefault()}>
-        <input
-          style={style.input}
-          name="q"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by username or name"
-        />
-        <button type="submit" style={style.btnSm}>Search</button>
-        {search !== '' && (
-          <a href="/faculty/students" style={style.btnLink}>Clear</a>
+        {flash && (
+          <div style={{ ...style.flash, ...(flash.type === 'ok' ? style.flashOk : style.flashErr) }}>{flash.msg}</div>
         )}
-      </form>
 
-      <table style={style.table}>
-        <thead>
-          <tr>
-            <th>Username</th>
-            <th>Full name</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((s) => (
-            <tr key={s.id}>
-              <td>{s.username}</td>
-              <td>{s.name}</td>
-              <td style={style.tdActions}>
-                <form onSubmit={(e) => { e.preventDefault(); resetPassword(s.id, s.username); }} style={{ display: 'inline', marginRight: 6 }}>
-                  <button style={style.btnSmGray}>Reset password</button>
-                </form>
-                <form onSubmit={(e) => { e.preventDefault(); deleteStudent(s.id, s.username); }} style={{ display: 'inline' }}>
-                  <button style={style.btnSmRed}>Delete</button>
-                </form>
-              </td>
-            </tr>
-          ))}
-          {students.length === 0 && (
-            <tr>
-              <td colSpan={3} style={style.mutedTd}>
-                No students yet. Create one above or import an Excel file.
-              </td>
-            </tr>
+        <p style={style.muted}>
+          Every student&apos;s <b>password is the same as the username</b> (roll number). Students log in with the username, that password, and the exam code.
+        </p>
+
+        <div style={style.row}>
+          <div style={style.card}>
+            <h3 style={{ marginTop: 0 }}>1. Create manually</h3>
+            <form onSubmit={addStudent} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <label style={style.label}>Username (roll number)</label>
+              <input
+                style={style.input}
+                name="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. 21CS001"
+                required
+                maxLength="50"
+              />
+              <label style={style.label}>Full name</label>
+              <input
+                style={style.input}
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Ravi Kumar"
+                maxLength="100"
+              />
+              <button type="submit" style={style.btnPrimary}>Create student</button>
+            </form>
+          </div>
+
+          <div style={style.card}>
+            <h3 style={{ marginTop: 0 }}>2. Import from Excel</h3>
+            <p style={style.muted}>
+              File (.xlsx or .csv): <b>Column A = username</b>, <b>Column B = full name</b>. A header row is allowed.{' '}
+              <a href="#" style={style.link}>Download sample file</a>
+            </p>
+            <form onSubmit={importStudents} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <label style={style.label}>Excel / CSV file</label>
+              <input
+                type="file"
+                name="file"
+                accept=".xlsx,.csv"
+                required
+                onChange={(e) => setFile(e.target.files[0])}
+              />
+              <button type="submit" style={style.btnPrimary}>Import students</button>
+            </form>
+            <p className="muted">
+              Tip: format column A as <b>Text</b> in Excel so roll numbers like 0012 keep their zeros. Max 1000 students per file.
+            </p>
+          </div>
+        </div>
+
+        <h3 style={style.h3}>Students ({total})</h3>
+        <form style={style.searchForm} onSubmit={(e) => e.preventDefault()}>
+          <input
+            style={style.input}
+            name="q"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by username or name"
+          />
+          <button type="submit" style={style.btnSm}>Search</button>
+          {search !== '' && (
+            <a href="/faculty/students" style={style.btnLink}>Clear</a>
           )}
-        </tbody>
-      </table>
+        </form>
+
+        <table style={style.table}>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Full name</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {students.map((s) => (
+              <tr key={s.id}>
+                <td>{s.username}</td>
+                <td>{s.name}</td>
+                <td style={style.tdActions}>
+                  <form onSubmit={(e) => { e.preventDefault(); resetPassword(s.id, s.username); }} style={{ display: 'inline', marginRight: 6 }}>
+                    <button style={style.btnSmGray}>Reset password</button>
+                  </form>
+                  <form onSubmit={(e) => { e.preventDefault(); deleteStudent(s.id, s.username); }} style={{ display: 'inline' }}>
+                    <button style={style.btnSmRed}>Delete</button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+            {students.length === 0 && (
+              <tr>
+                <td colSpan={3} style={style.mutedTd}>
+                  No students yet. Create one above or import an Excel file.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        </>
       )}
     </div>
   );

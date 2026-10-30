@@ -103,180 +103,182 @@ export default function FacultyDashboard() {
     <div style={style.page}>
       {loading && <Loading />}
       {!loading && (
-      <nav style={style.nav}>
-        <b>Exam Portal</b>
-        <span style={style.spacer}></span>
-        <span>Faculty</span>
-        <button onClick={() => supabase.auth.signOut()} style={style.btnDanger}>Logout</button>
-      </nav>
+        <>
+        <nav style={style.nav}>
+          <b>Exam Portal</b>
+          <span style={style.spacer}></span>
+          <span>Faculty</span>
+          <button onClick={() => supabase.auth.signOut()} style={style.btnDanger}>Logout</button>
+        </nav>
 
-      {flash && (
-        <div style={{ ...style.flash, ...(flash.type === 'ok' ? style.flashOk : style.flashErr) }}>
-          {flash.msg}
-        </div>
-      )}
-
-      <div style={style.stats}>
-        <div style={style.stat}>
-          <small>My exams</small>
-          <b>{totalExams}</b>
-        </div>
-        <div style={style.stat}>
-          <small>Live now</small>
-          <b>{liveExams}</b>
-        </div>
-        <div style={style.stat}>
-          <small>Next step</small>
-          <b>
-            <a href="/faculty/students" style={style.link}>
-              Add students
-            </a>
-          </b>
-        </div>
-      </div>
-
-      <details
-        open={!totalExams}
-        style={style.card}
-        onToggle={(e) => setShowCreate(e.target.open)}
-      >
-        <summary>+ Create new exam</summary>
-        <form onSubmit={createExam} style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <input
-            style={style.input}
-            name="title"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            placeholder="Exam title"
-            required
-          />
-          <input
-            style={{ ...style.input, width: 120 }}
-            type="number"
-            name="duration"
-            value={form.duration}
-            onChange={(e) => setForm({ ...form, duration: e.target.value })}
-            min="1"
-            max="600"
-            placeholder="60"
-          />
-          <input
-            style={{ ...style.input, width: 120 }}
-            type="number"
-            name="max_violations"
-            value={form.max_violations}
-            onChange={(e) => setForm({ ...form, max_violations: e.target.value })}
-            min="1"
-            max="20"
-            placeholder="3"
-          />
-          <button type="submit" style={style.btnPrimary}>Create exam</button>
-        </form>
-      </details>
-
-      <h3 style={style.h3}>My exams</h3>
-      <table style={style.table}>
-        <thead>
-          <tr>
-            <th>Exam</th>
-            <th>Code</th>
-            <th>Status</th>
-            <th>Questions</th>
-            <th>Students</th>
-            <th>Duration</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {exams.map((e) => (
-            <tr key={e.id} style={selected?.id === e.id ? style.selRow : {}}>
-              <td>
-                <Link to={`/faculty/questions/${e.id}`} onClick={() => loadExamDetail(e.id)}>
-                  <b>{e.title}</b>
-                </Link>
-              </td>
-              <td><b>{e.code}</b></td>
-              <td>
-                <span style={style.badge(statusColor(e.status))}>{e.status}</span>
-              </td>
-              <td>{e.qc}</td>
-              <td>{e.sc}</td>
-              <td>{e.duration_min} min</td>
-              <td style={style.tdActions}>
-                <Link to={`/faculty/questions/${e.id}`} onClick={() => loadExamDetail(e.id)}>
-                  <button style={style.btnSm}>{e.status === 'draft' ? 'Manage questions' : 'View'}</button>
-                </Link>{' '}
-                <Link to={`/faculty/monitor/${e.id}`}>
-                  <button style={style.btnSmGreen}>Monitor</button>
-                </Link>
-                {e.status !== 'live' && (
-                  <button onClick={() => deleteExam(e.id)} style={style.btnSmRed}>
-                    Delete
-                  </button>
-                )}
-                {e.status === 'draft' && (
-                  <button
-                    onClick={() => startExam(e.id)}
-                    disabled={e.qc === 0}
-                    style={{ ...style.btnSmGreen, ...(e.qc === 0 ? style.disabled : {}) }}
-                    title={e.qc === 0 ? 'Add at least one question first' : ''}
-                  >
-                    Start exam
-                  </button>
-                )}
-                {e.status === 'live' && (
-                  <button onClick={() => endExam(e.id)} style={style.btnSmRed}>
-                    End exam
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-          {exams.length === 0 && (
-            <tr>
-              <td colSpan={7} style={style.mutedTd}>
-                No exams yet. Create your first exam above.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-
-      {selected && (
-        <div style={style.card}>
-          <div style={style.qhead}>
-            <h2 style={{ margin: 0 }}>
-              {selected.title}
-              <span style={style.badge(statusColor(selected.status))}>{selected.status}</span>
-            </h2>
-            <div>
-              Exam code: <span style={style.code}>{selected.code}</span>
-            </div>
+        {flash && (
+          <div style={{ ...style.flash, ...(flash.type === 'ok' ? style.flashOk : style.flashErr) }}>
+            {flash.msg}
           </div>
-          <p style={style.muted}>
-            {questions.length} question(s) &middot; {selected.duration_min} min &middot;
-            lock after {selected.max_violations} violations &middot; {selStudents} student(s) logged in
-          </p>
-          <div style={style.actions}>
-            {selected.status === 'draft' && (
-              <>
-                <Link to={`/faculty/questions/${selected.id}`}>
-                  <button style={style.btn}>Create / edit questions</button>
-                </Link>
-                <Link to={`/faculty/monitor/${selected.id}`}>
-                  <button style={style.btnGray}>Open live monitor</button>
-                </Link>
-                <button onClick={() => deleteExam(selected.id)} style={style.btnRed}>
-                  Delete exam
-                </button>
-              </>
+        )}
+
+        <div style={style.stats}>
+          <div style={style.stat}>
+            <small>My exams</small>
+            <b>{totalExams}</b>
+          </div>
+          <div style={style.stat}>
+            <small>Live now</small>
+            <b>{liveExams}</b>
+          </div>
+          <div style={style.stat}>
+            <small>Next step</small>
+            <b>
+              <a href="/faculty/students" style={style.link}>
+                Add students
+              </a>
+            </b>
+          </div>
+        </div>
+
+        <details
+          open={!totalExams}
+          style={style.card}
+          onToggle={(e) => setShowCreate(e.target.open)}
+        >
+          <summary>+ Create new exam</summary>
+          <form onSubmit={createExam} style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <input
+              style={style.input}
+              name="title"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="Exam title"
+              required
+            />
+            <input
+              style={{ ...style.input, width: 120 }}
+              type="number"
+              name="duration"
+              value={form.duration}
+              onChange={(e) => setForm({ ...form, duration: e.target.value })}
+              min="1"
+              max="600"
+              placeholder="60"
+            />
+            <input
+              style={{ ...style.input, width: 120 }}
+              type="number"
+              name="max_violations"
+              value={form.max_violations}
+              onChange={(e) => setForm({ ...form, max_violations: e.target.value })}
+              min="1"
+              max="20"
+              placeholder="3"
+            />
+            <button type="submit" style={style.btnPrimary}>Create exam</button>
+          </form>
+        </details>
+
+        <h3 style={style.h3}>My exams</h3>
+        <table style={style.table}>
+          <thead>
+            <tr>
+              <th>Exam</th>
+              <th>Code</th>
+              <th>Status</th>
+              <th>Questions</th>
+              <th>Students</th>
+              <th>Duration</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {exams.map((e) => (
+              <tr key={e.id} style={selected?.id === e.id ? style.selRow : {}}>
+                <td>
+                  <Link to={`/faculty/questions/${e.id}`} onClick={() => loadExamDetail(e.id)}>
+                    <b>{e.title}</b>
+                  </Link>
+                </td>
+                <td><b>{e.code}</b></td>
+                <td>
+                  <span style={style.badge(statusColor(e.status))}>{e.status}</span>
+                </td>
+                <td>{e.qc}</td>
+                <td>{e.sc}</td>
+                <td>{e.duration_min} min</td>
+                <td style={style.tdActions}>
+                  <Link to={`/faculty/questions/${e.id}`} onClick={() => loadExamDetail(e.id)}>
+                    <button style={style.btnSm}>{e.status === 'draft' ? 'Manage questions' : 'View'}</button>
+                  </Link>{' '}
+                  <Link to={`/faculty/monitor/${e.id}`}>
+                    <button style={style.btnSmGreen}>Monitor</button>
+                  </Link>
+                  {e.status !== 'live' && (
+                    <button onClick={() => deleteExam(e.id)} style={style.btnSmRed}>
+                      Delete
+                    </button>
+                  )}
+                  {e.status === 'draft' && (
+                    <button
+                      onClick={() => startExam(e.id)}
+                      disabled={e.qc === 0}
+                      style={{ ...style.btnSmGreen, ...(e.qc === 0 ? style.disabled : {}) }}
+                      title={e.qc === 0 ? 'Add at least one question first' : ''}
+                    >
+                      Start exam
+                    </button>
+                  )}
+                  {e.status === 'live' && (
+                    <button onClick={() => endExam(e.id)} style={style.btnSmRed}>
+                      End exam
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {exams.length === 0 && (
+              <tr>
+                <td colSpan={7} style={style.mutedTd}>
+                  No exams yet. Create your first exam above.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        {selected && (
+          <div style={style.card}>
+            <div style={style.qhead}>
+              <h2 style={{ margin: 0 }}>
+                {selected.title}
+                <span style={style.badge(statusColor(selected.status))}>{selected.status}</span>
+              </h2>
+              <div>
+                Exam code: <span style={style.code}>{selected.code}</span>
+              </div>
+            </div>
+            <p style={style.muted}>
+              {questions.length} question(s) &middot; {selected.duration_min} min &middot;
+              lock after {selected.max_violations} violations &middot; {selStudents} student(s) logged in
+            </p>
+            <div style={style.actions}>
+              {selected.status === 'draft' && (
+                <>
+                  <Link to={`/faculty/questions/${selected.id}`}>
+                    <button style={style.btn}>Create / edit questions</button>
+                  </Link>
+                  <Link to={`/faculty/monitor/${selected.id}`}>
+                    <button style={style.btnGray}>Open live monitor</button>
+                  </Link>
+                  <button onClick={() => deleteExam(selected.id)} style={style.btnRed}>
+                    Delete exam
+                  </button>
+                </>
+              )}
+            </div>
+            {selected.status !== 'draft' && (
+              <div style={style.alertErr}>This exam is {selected.status}, so its settings and questions are locked.</div>
             )}
           </div>
-          {selected.status !== 'draft' && (
-            <div style={style.alertErr}>This exam is {selected.status}, so its settings and questions are locked.</div>
-          )}
-        </div>
-      )}
+        )}
+        </>
       )}
     </div>
   );

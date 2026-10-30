@@ -143,154 +143,157 @@ export default function QuestionsEditor() {
     <div style={style.page}>
       {loading && <Loading />}
       {!loading && (
-      <nav style={style.nav}>
-        <Link to="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</Link>
-        <span style={style.spacer}></span>
-        <span>Questions — {exam?.title}</span>
-      </nav>
-
-      {flash && (
-        <div style={{ ...style.flash, ...(flash.type === 'ok' ? style.flashOk : style.flashErr) }}>{flash.msg}</div>
-      )}
-
-      {!exam ? (
-        <p>Loading…</p>
-      ) : (
         <>
-          <div style={style.qhead}>
-            <h2 style={{ margin: 0 }}>{exam.title}</h2>
-            <div>Exam code: <span style={style.code}>{exam.code}</span></div>
-          </div>
-          <p style={style.muted}>{questions.length} question(s) so far</p>
+        <nav style={style.nav}>
+          <Link to="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</Link>
+          <span style={style.spacer}></span>
+          <span>Questions — {exam?.title}</span>
+        </nav>
 
-          {!draft && (
-            <div style={style.alert}>This exam is {exam.status}, so its questions are locked and shown read-only.</div>
-          )}
+        {flash && (
+          <div style={{ ...style.flash, ...(flash.type === 'ok' ? style.flashOk : style.flashErr) }}>{flash.msg}</div>
+        )}
 
-          {draft && (
-            <>
-              <div style={style.row}>
-                <div style={style.card}>
-                  <h3 style={{ marginTop: 0 }}>1. Create manually</h3>
-                  <form onSubmit={addQuestion} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <label style={style.label}>Question {questions.length + 1}</label>
-                    <textarea
-                      style={style.textarea}
-                      name="body"
-                      value={manualBody}
-                      onChange={(e) => setManualBody(e.target.value)}
-                      placeholder="Write the question here..."
-                      required
-                    />
-                    <button type="submit" style={style.btnPrimary}>Add question</button>
-                  </form>
-                </div>
+        {!exam ? (
+          <p>Loading…</p>
+        ) : (
+          <>
+            <div style={style.qhead}>
+              <h2 style={{ margin: 0 }}>{exam.title}</h2>
+              <div>Exam code: <span style={style.code}>{exam.code}</span></div>
+            </div>
+            <p style={style.muted}>{questions.length} question(s) so far</p>
 
-                <div style={style.card}>
-                  <h3 style={{ marginTop: 0 }}>2. Import from a Word document</h3>
-                  <p style={style.muted}>Upload a .docx file. You will see a preview and can edit or remove questions before saving.</p>
-                  <form onSubmit={readDocx} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <label style={style.label}>Word file (.docx)</label>
-                    <input type="file" name="file" accept=".docx" required onChange={handleFileSelect} />
-                    <label style={style.label}>How are the questions separated?</label>
-                    <select
-                      style={style.input}
-                      name="mode"
-                      value={mode}
-                      onChange={(e) => setMode(e.target.value)}
-                    >
-                      {Object.entries(MODES).map(([k, label]) => (
-                        <option key={k} value={k}>{label}</option>
-                      ))}
-                    </select>
-                    <button type="submit" style={style.btnPrimary} disabled={importLoading}>
-                      {importLoading ? 'Reading…' : 'Read document'}
-                    </button>
-                  </form>
-                  <p style={style.muted}>Only text is imported (images and equations are skipped).</p>
-                </div>
-              </div>
+            {!draft && (
+              <div style={style.alert}>This exam is {exam.status}, so its questions are locked and shown read-only.</div>
+            )}
 
-              {preview && (
-                <div style={style.card}>
-                  <h3 style={{ marginTop: 0 }}>Preview: {preview.items.length} question(s) found in “{preview.file}”</h3>
-                  <p style={style.muted}>
-                    Detected using: <b>{MODES[preview.mode]}</b>.
-                    {preview.ignored && ` Text before the first question (${preview.ignored} paragraph(s)) was ignored.`}{' '}
-                    {preview.note}
-                  </p>
-                  <form onSubmit={confirmImport} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {preview.items.map((t, i) => (
-                      <div key={i} style={style.item}>
-                        <label style={style.itemLabel}>
-                          <input
-                            type="checkbox"
-                            name={`q[${i}][keep]`}
-                            defaultChecked
-                            style={{ width: 'auto', marginRight: 8 }}
-                          />
-                          Item {i + 1}
-                        </label>
-                        <textarea
-                          style={style.textarea}
-                          name={`q[${i}][body]`}
-                          defaultValue={t}
-                          maxLength="20000"
-                        />
-                      </div>
-                    ))}
-                    <button type="submit" style={style.btnPrimary}>Add selected questions</button>
-                    <button
-                      type="button"
-                      onClick={() => setPreview(null)}
-                      style={{ ...style.btn, background: '#6b7280', marginLeft: 8 }}
-                    >
-                      Cancel
-                    </button>
-                  </form>
-                </div>
-              )}
-
-              <h3 id="list" style={style.h3}>Questions in this exam ({questions.length})</h3>
-              {questions.map((q) => (
-                <div key={q.id} style={style.cardItem}>
-                  <div style={style.qheadItem}>
-                    <b>Question {q.q_no}</b>
-                  </div>
-                  {draft ? (
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const body = e.target.elements.body.value;
-                        updateQuestion(q.id, body);
-                      }}
-                      style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
-                    >
+            {draft && (
+              <>
+                <div style={style.row}>
+                  <div style={style.card}>
+                    <h3 style={{ marginTop: 0 }}>1. Create manually</h3>
+                    <form onSubmit={addQuestion} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <label style={style.label}>Question {questions.length + 1}</label>
                       <textarea
                         style={style.textarea}
                         name="body"
-                        defaultValue={q.body}
+                        value={manualBody}
+                        onChange={(e) => setManualBody(e.target.value)}
+                        placeholder="Write the question here..."
                         required
                       />
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button type="submit" style={style.btnSm}>Save changes</button>
-                        <button
-                          type="button"
-                          onClick={() => deleteQuestion(q.id)}
-                          style={style.btnSmRed}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <button type="submit" style={style.btnPrimary}>Add question</button>
                     </form>
-                  ) : (
-                    <div style={style.questionBody}>{q.body}</div>
-                  )}
+                  </div>
+
+                  <div style={style.card}>
+                    <h3 style={{ marginTop: 0 }}>2. Import from a Word document</h3>
+                    <p style={style.muted}>Upload a .docx file. You will see a preview and can edit or remove questions before saving.</p>
+                    <form onSubmit={readDocx} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <label style={style.label}>Word file (.docx)</label>
+                      <input type="file" name="file" accept=".docx" required onChange={handleFileSelect} />
+                      <label style={style.label}>How are the questions separated?</label>
+                      <select
+                        style={style.input}
+                        name="mode"
+                        value={mode}
+                        onChange={(e) => setMode(e.target.value)}
+                      >
+                        {Object.entries(MODES).map(([k, label]) => (
+                          <option key={k} value={k}>{label}</option>
+                        ))}
+                      </select>
+                      <button type="submit" style={style.btnPrimary} disabled={importLoading}>
+                        {importLoading ? 'Reading…' : 'Read document'}
+                      </button>
+                    </form>
+                    <p className="muted">Only text is imported (images and equations are skipped).</p>
+                  </div>
                 </div>
-              ))}
-              {questions.length === 0 && <p style={style.muted}>No questions yet.</p>}
-            </>
-          )}
+
+                {preview && (
+                  <div style={style.card}>
+                    <h3 style={{ marginTop: 0 }}>Preview: {preview.items.length} question(s) found in “{preview.file}”</h3>
+                    <p className="muted">
+                      Detected using: <b>{MODES[preview.mode]}</b>.
+                      {preview.ignored && ` Text before the first question (${preview.ignored} paragraph(s)) was ignored.`}{' '}
+                      {preview.note}
+                    </p>
+                    <form onSubmit={confirmImport} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {preview.items.map((t, i) => (
+                        <div key={i} style={style.item}>
+                          <label style={style.itemLabel}>
+                            <input
+                              type="checkbox"
+                              name={`q[${i}][keep]`}
+                              defaultChecked
+                              style={{ width: 'auto', marginRight: 8 }}
+                            />
+                            Item {i + 1}
+                          </label>
+                          <textarea
+                            style={style.textarea}
+                            name={`q[${i}][body]`}
+                            defaultValue={t}
+                            maxLength="20000"
+                          />
+                        </div>
+                      ))}
+                      <button type="submit" style={style.btnPrimary}>Add selected questions</button>
+                      <button
+                        type="button"
+                        onClick={() => setPreview(null)}
+                        style={{ ...style.btn, background: '#6b7280', marginLeft: 8 }}
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                <h3 id="list" style={style.h3}>Questions in this exam ({questions.length})</h3>
+                {questions.map((q) => (
+                  <div key={q.id} style={style.cardItem}>
+                    <div style={style.qheadItem}>
+                      <b>Question {q.q_no}</b>
+                    </div>
+                    {draft ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const body = e.target.elements.body.value;
+                          updateQuestion(q.id, body);
+                        }}
+                        style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+                      >
+                        <textarea
+                          style={style.textarea}
+                          name="body"
+                          defaultValue={q.body}
+                          required
+                        />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button type="submit" style={style.btnSm}>Save changes</button>
+                          <button
+                            type="button"
+                            onClick={() => deleteQuestion(q.id)}
+                            style={style.btnSmRed}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div style={style.questionBody}>{q.body}</div>
+                    )}
+                  </div>
+                ))}
+                {questions.length === 0 && <p style={style.muted}>No questions yet.</p>}
+              </>
+            )}
+          </>
+        )}
         </>
       )}
     </div>

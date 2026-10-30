@@ -61,81 +61,81 @@ export default function StudentDashboard() {
     <div style={style.page}>
       {loading && <Loading />}
       {!loading && (
-      <nav style={style.nav}>
-        <b>Exam Portal</b>
-        <span style={style.spacer}></span>
-        <span>Student Dashboard</span>
-        <button
-          onClick={() => {
-            localStorage.removeItem('exam_student_token');
-            localStorage.removeItem('exam_student_jwt');
-            localStorage.removeItem('exam_student_user');
-            window.location.href = '/student/login';
-          }}
-          style={style.btnDanger}
-        >
-          Logout
-        </button>
-      </nav>
+        <>
+        <nav style={style.nav}>
+          <b>Exam Portal</b>
+          <span style={style.spacer}></span>
+          <span>Student Dashboard</span>
+          <button
+            onClick={() => {
+              localStorage.removeItem('exam_student_token');
+              localStorage.removeItem('exam_student_jwt');
+              localStorage.removeItem('exam_student_user');
+              window.location.href = '/student/login';
+            }}
+            style={style.btnDanger}
+          >
+            Logout
+          </button>
+        </nav>
 
-      <div style={style.card}>
-        <h2 style={{ marginTop: 0 }}>Welcome, Student</h2>
-        {state && (
-          <>
-            <p style={style.muted}>
-              One question from this exam&rsquo;s faculty-created question list is assigned when you enter.
-            </p>
-            <div style={style.stats}>
-              <div style={style.stat}>
-                <small>Status</small>
-                <b style={style.badge(state.status)}>{state.status}</b>
+        <div style={style.card}>
+          <h2 style={{ marginTop: 0 }}>Welcome, Student</h2>
+          {state && (
+            <>
+              <p style={style.muted}>
+                One question from this exam&rsquo;s faculty-created question list is assigned when you enter.
+              </p>
+              <div style={style.stats}>
+                <div style={style.stat}>
+                  <small>Status</small>
+                  <b style={style.badge(state.status)}>{state.status}</b>
+                </div>
+                <div style={style.stat}>
+                  <small>Time left</small>
+                  <b id="timeLeft">{fmt(state.seconds_left)}</b>
+                </div>
+                <div style={style.stat}>
+                  <small>Violations</small>
+                  <b>{state.violations}/{state.max}</b>
+                </div>
               </div>
-              <div style={style.stat}>
-                <small>Time left</small>
-                <b id="timeLeft">{fmt(state.seconds_left)}</b>
-              </div>
-              <div style={style.stat}>
-                <small>Violations</small>
-                <b>{state.violations}/{state.max}</b>
-              </div>
-            </div>
-            <p id="note" className="muted" style={style.muted}>
-              {btnOn
-                ? 'The exam is live. Click "Enter exam" to open your question.'
-                : state.status === 'ended'
-                ? 'This exam has ended.'
-                : state.locked
-                ? 'Your exam is locked.'
-                : 'One question from this exam&rsquo;s faculty-created question list is assigned when you enter.'}
-            </p>
-            <a href="/student/exam" style={style.btnLink(btnOn)}>
-              {btnText()}
-            </a>
-          </>
-        )}
-        {!state && <p>Loading…</p>}
-      </div>
+              <p id="note" className="muted" style={style.muted}>
+                {btnOn
+                  ? 'The exam is live. Click "Enter exam" to open your question.'
+                  : state.status === 'ended'
+                  ? 'This exam has ended.'
+                  : state.locked
+                  ? 'Your exam is locked.'
+                  : 'One question from this exam&rsquo;s faculty-created question list is assigned when you enter.'}
+              </p>
+              <a href="/student/exam" style={style.btnLink(btnOn)}>
+                {btnText()}
+              </a>
+            </>
+          )}
+          {!state && <p>Loading…</p>}
+        </div>
 
-      <div style={style.card}>
-        <h3 style={{ marginTop: 0 }}>Instructions</h3>
-        <ul style={style.rules}>
-          <li>Stay on this page until the faculty starts the exam. The button turns active when it starts.</li>
-          <li>When you enter fullscreen, one question from this exam&rsquo;s faculty-created question list is assigned to you. If you re-enter, you keep the same question.</li>
-          <li>The exam opens in <b>fullscreen</b>. Your question is shown only while you are in fullscreen.</li>
-          <li>Do <b>not</b> switch tabs, open other windows, or leave fullscreen. Each time is recorded as a violation.</li>
-          <li>After <b>{state ? state.max : '?'}</b> violations your exam is locked and you must contact the faculty.</li>
-          <li>Copy, paste, right-click and developer shortcuts are disabled.</li>
-          <li>Logging in from another browser logs you out of the first one.</li>
-        </ul>
-      </div>
+        <div style={style.card}>
+          <h3 style={{ marginTop: 0 }}>Instructions</h3>
+          <ul style={style.rules}>
+            <li>Stay on this page until the faculty starts the exam. The button turns active when it starts.</li>
+            <li>When you enter fullscreen, one question from this exam&rsquo;s faculty-created question list is assigned to you. If you re-enter, you keep the same question.</li>
+            <li>The exam opens in <b>fullscreen</b>. Your question is shown only while you are in fullscreen.</li>
+            <li>Do <b>not</b> switch tabs, open other windows, or leave fullscreen. Each time is recorded as a violation.</li>
+            <li>After <b>{state ? state.max : '?'}</b> violations your exam is locked and you must contact the faculty.</li>
+            <li>Copy, paste, right-click and developer shortcuts are disabled.</li>
+            <li>Logging in from another browser logs you out of the first one.</li>
+          </ul>
+        </div>
 
-      {error && <div style={style.alert}>{error}</div>}
+        {error && <div style={style.alert}>{error}</div>}
+        </>
       )}
     </div>
   );
 }
-
-import { supabase } from '../lib/supabase.js';
 
 const style = {
   page: { fontFamily: 'system-ui, sans-serif', maxWidth: 1100, margin: '0 auto', padding: 16 },

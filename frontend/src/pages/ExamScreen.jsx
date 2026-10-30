@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { API_BASE } from '../lib/supabase.js';
+import Loading from '../components/Loading.jsx';
 
 export default function ExamScreen() {
   const [data, setData] = useState(null);
@@ -304,12 +305,7 @@ export default function ExamScreen() {
           <b>Backend not reachable:</b> The exam server on port 5000 is not running. Please start the backend and refresh this page.
         </div>
       )}
-      {loading && (
-        <div style={style.loading}>
-          <div style={style.spinner}></div>
-          <p style={style.loadingText}>Connecting to exam server…</p>
-        </div>
-      )}
+      {loading && <Loading message="Connecting to exam server…" />}
       <div id="warn" className="alert" style={{ ...style.alert, display: 'none' }}></div>
       <main id="main" style={style.main}>
         <p className="muted" style={style.muted}>
@@ -336,7 +332,7 @@ export default function ExamScreen() {
           </button>
         </div>
       </div>
-      <style jsx>{`
+      <style>{`
         .exam { user-select: none; -webkit-user-select: none }
         body.exam, #root.exam { background: #f4f6f9; }
       `}</style>
@@ -378,14 +374,4 @@ const style = {
     background: '#fde8e8', color: '#9b1c1c', padding: '10px 14px',
     borderRadius: 6, margin: '10px 0',
   },
-  loading: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center', height: '60vh', gap: 12,
-  },
-  spinner: {
-    width: 40, height: 40, border: '4px solid #e5e7eb',
-    borderTop: '4px solid #2b5cff', borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  },
-  loadingText: { color: '#6b7280', fontSize: 16 },
 };

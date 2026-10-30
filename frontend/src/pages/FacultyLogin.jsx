@@ -80,12 +80,16 @@ export default function FacultyLogin() {
           required
         />
         <button type="submit" style={{ ...style.btn, ...style.btnPrimary }} disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign in'}
+          <LoadingButtonContent loading={loading} loadingLabel="Signing in…">
+            Sign in
+          </LoadingButtonContent>
         </button>
       </form>
       <p style={style.muted}>Don't have an account?</p>
       <button onClick={handleSignup} style={{ ...style.btn, ...style.btnOutline }} disabled={loading}>
-        {loading ? 'Creating...' : 'Create faculty account'}
+        <LoadingButtonContent loading={loading} loadingLabel="Creating…">
+          Create faculty account
+        </LoadingButtonContent>
       </button>
     </div>
   );

@@ -1,0 +1,37 @@
+/* Global styles for the exam portal (Vite handles CSS imports natively). */
+
+/* Shared, namespaced loading spinner keyframes. `examSpin` is deliberately
+   prefixed so it cannot collide with any other animation in the app. */
+@keyframes examSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.exam-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #2b5cff;
+  border-radius: 50%;
+  animation: examSpin 1s linear infinite;
+  flex: none;
+}
+
+.exam-spinner--sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.exam-spinner--light {
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+}
+
+/* Respect users who ask for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .exam-spinner {
+    animation-duration: 3s;
+  }
+}
