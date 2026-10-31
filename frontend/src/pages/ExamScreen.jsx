@@ -43,8 +43,7 @@ export default function ExamScreen() {
   async function getJson(url, options = {}) {
     const res = await fetch(url, options);
     if (res.status === 403) {
-      window.location.href = '/student/login';
-      throw new Error('Session expired');
+      throw new Error('Session expired or access denied');
     }
     const raw = await res.text();
     let d;
@@ -190,7 +189,7 @@ export default function ExamScreen() {
       });
 
       if (!d.entered) {
-        // Not assigned yet: call /enter using the exam code from sessionStorage (no user input)
+        // Not assigned yet: call /enter using the exam code from sessionStorage with start_exam: true
         const code = sessionStorage.getItem('exam_student_code') || '';
         const enterRes = await getJson(`${API_BASE}/student/enter`, {
           method: 'POST',
@@ -198,8 +197,11 @@ export default function ExamScreen() {
             'Content-Type': 'application/json',
             ...(await jwtAuthHeaders()),
           },
-          body: JSON.stringify({ exam_code: code }),
+          body: JSON.stringify({ exam_code: code, start_exam: true }),
         });
+        if (enterRes.session_token) {
+          sessionStorage.setItem('exam_student_token', enterRes.session_token);
+        }
         applyData(enterRes);
         if (!enterRes.locked && document.fullscreenElement) {
           setArmed(true);
@@ -237,8 +239,12 @@ export default function ExamScreen() {
     }
 
     function handleBlur() {
-      sendLeaveSignal();
-      recordViolation('Window lost focus');
+      // Blur can fire during clicks inside the window or focus shifts.
+      // Only record a violation if document is hidden or fullscreen was dropped.
+      if (document.hidden || !document.fullscreenElement) {
+        sendLeaveSignal();
+        recordViolation('Window lost focus');
+      }
     }
 
     function handleFullscreenChange() {
@@ -286,7 +292,8 @@ export default function ExamScreen() {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('keydown', handleKeyDown);
 
-    const blocked = ['contextmenu', 'copy', 'cut', 'paste', 'selectstart', 'dragstart'];
+    // Keep contextmenu, copy, cut, paste restricted, but permit normal mouse selection & clicks
+    const blocked = ['contextmenu', 'copy', 'cut', 'paste'];
     blocked.forEach((ev) => document.addEventListener(ev, blockEvent));
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', handlePageHide);

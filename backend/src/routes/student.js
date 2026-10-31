@@ -14,11 +14,19 @@ router.get('/dashboard-state', verifyStudentSession, async (req, res) => {
     const s = req.student;
     let status = s.status;
     const nowEpoch = Math.floor(Date.now() / 1000);
-    const startedEpoch = s.started_at_epoch ? parseInt(s.started_at_epoch, 10) : null;
+    const enteredEpoch = s.entered_at_epoch ? parseInt(s.entered_at_epoch, 10) : null;
 
-    if (status === 'live' && startedEpoch != null && nowEpoch - startedEpoch >= s.duration_min * 60) {
-      await query('UPDATE exams SET status = $1 WHERE id = $2 AND status = $3', ['ended', s.exam_id, 'live']);
-      status = 'ended';
+    let seconds_left = null;
+    if (status === 'live') {
+      if (enteredEpoch == null) {
+        seconds_left = s.duration_min * 60;
+      } else {
+        const elapsed = nowEpoch - enteredEpoch;
+        seconds_left = Math.max(0, s.duration_min * 60 - elapsed);
+        if (elapsed >= s.duration_min * 60) {
+          status = 'ended';
+        }
+      }
     }
 
     res.json({
@@ -27,7 +35,7 @@ router.get('/dashboard-state', verifyStudentSession, async (req, res) => {
       locked: !!s.locked,
       violations: parseInt(s.violations, 10),
       max: parseInt(s.max_violations, 10),
-      seconds_left: status === 'live' ? Math.max(0, s.duration_min * 60 - (nowEpoch - startedEpoch)) : null,
+      seconds_left,
     });
   } catch (err) {
     console.error('GET /dashboard-state error:', err);
@@ -42,7 +50,7 @@ router.get('/dashboard-state', verifyStudentSession, async (req, res) => {
 // ------------------------------------------------------------------
 router.post('/enter', verifyStudentJwt, async (req, res) => {
   try {
-    const { exam_code } = req.body;
+    const { exam_code, start_exam } = req.body;
     if (!exam_code) {
       return res.status(400).json({ error: 'Exam code is required' });
     }
@@ -62,20 +70,20 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
 
       // Check existing session for this student + exam
       const existing = await query(
-        'SELECT id, token, q_id FROM exam_sessions WHERE exam_id = $1 AND user_id = $2',
+        'SELECT id, token, q_id, assigned_q_ids, entered_at FROM exam_sessions WHERE exam_id = $1 AND user_id = $2',
         [exam.id, s.userId]
       );
 
       let sessionId;
-      let token = crypto.randomBytes(16).toString('hex');
+      let token;
       let notice = null;
 
       if (existing.rows.length > 0) {
-        // Re-login: rotate token (kicks out older browser)
         sessionId = existing.rows[0].id;
-        token = crypto.randomBytes(16).toString('hex');
+        token = existing.rows[0].token || crypto.randomBytes(16).toString('hex');
         await query('UPDATE exam_sessions SET token = $1, last_seen = now() WHERE id = $2', [token, sessionId]);
       } else {
+        token = crypto.randomBytes(16).toString('hex');
         const orderRow = await query('SELECT COALESCE(MAX(login_order), 0) AS mx FROM exam_sessions WHERE exam_id = $1', [exam.id]);
         const order = parseInt(orderRow.rows[0].mx, 10) + 1;
         const ins = await query(
@@ -86,21 +94,33 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
         sessionId = ins.rows[0].id;
       }
 
-      const nowEpoch = Math.floor(Date.now() / 1000);
-      const startedEpoch = exam.started_at ? Math.floor(new Date(exam.started_at).getTime() / 1000) : null;
-      const elapsed = startedEpoch != null ? nowEpoch - startedEpoch : 0;
+      const curSession = (await query(
+        `SELECT id, q_id, assigned_q_ids, entered_at,
+                EXTRACT(EPOCH FROM (entered_at AT TIME ZONE 'UTC')) as entered_at_epoch
+         FROM exam_sessions WHERE id = $1 FOR UPDATE`,
+        [sessionId]
+      )).rows[0];
 
+      const nowEpoch = Math.floor(Date.now() / 1000);
+      let enteredEpoch = curSession.entered_at_epoch ? parseInt(curSession.entered_at_epoch, 10) : null;
+
+      // Start exam condition: if student explicitly clicked "Start Exam" (start_exam: true) or already entered previously
+      const shouldStart = Boolean(start_exam) || enteredEpoch != null;
+
+      if (shouldStart && enteredEpoch == null) {
+        await query('UPDATE exam_sessions SET entered_at = now() WHERE id = $1', [sessionId]);
+        enteredEpoch = nowEpoch;
+      }
+
+      const elapsed = enteredEpoch != null ? nowEpoch - enteredEpoch : 0;
       let qId = null;
       let qNo = 0;
       let assignedQuestionsList = [];
 
-      if (exam.status === 'live' && elapsed < exam.duration_min * 60) {
-        // Re-check assignment inside transaction
-        const cur = await query('SELECT q_id, assigned_q_ids FROM exam_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
-        const assigned = cur.rows[0];
-        const numQuestions = Math.max(1, parseInt(exam.questions_per_student, 10) || 1);
-        const hasAssigned = !!assigned.q_id || (Array.isArray(assigned.assigned_q_ids) && assigned.assigned_q_ids.length > 0);
+      const numQuestions = Math.max(1, parseInt(exam.questions_per_student, 10) || 1);
+      const hasAssigned = !!curSession.q_id || (Array.isArray(curSession.assigned_q_ids) && curSession.assigned_q_ids.length > 0);
 
+      if (exam.status === 'live' && shouldStart && elapsed < exam.duration_min * 60) {
         if (!hasAssigned) {
           const qs = await query(
             `SELECT q.id, q.q_no, q.body,
@@ -122,7 +142,7 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
             const firstPick = pickIds[0];
 
             await query(
-              'UPDATE exam_sessions SET q_id = $1, assigned_q_ids = $2, entered_at = now() WHERE id = $3',
+              'UPDATE exam_sessions SET q_id = $1, assigned_q_ids = $2 WHERE id = $3',
               [firstPick, pickIds, sessionId]
             );
 
@@ -137,9 +157,9 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
             notice = 'No questions have been set for this exam. Please inform the faculty.';
           }
         } else {
-          const assignedIds = Array.isArray(assigned.assigned_q_ids) && assigned.assigned_q_ids.length > 0
-            ? assigned.assigned_q_ids
-            : [assigned.q_id];
+          const assignedIds = Array.isArray(curSession.assigned_q_ids) && curSession.assigned_q_ids.length > 0
+            ? curSession.assigned_q_ids
+            : [curSession.q_id];
 
           const qrows = await query(
             'SELECT id, q_no, body FROM questions WHERE id = ANY($1) AND exam_id = $2 ORDER BY q_no ASC',
@@ -160,17 +180,30 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
 
       await query('COMMIT');
 
+      // Fetch fresh session info for response
+      const sess = await query('SELECT * FROM exam_sessions WHERE id = $1', [sessionId]);
+      const sessionRow = sess.rows[0];
+
+      let seconds_left = null;
+      if (exam.status === 'live') {
+        if (enteredEpoch == null) {
+          seconds_left = exam.duration_min * 60;
+        } else {
+          seconds_left = Math.max(0, exam.duration_min * 60 - elapsed);
+        }
+      }
+
       const out = {
-        status: exam.status === 'live' && elapsed >= exam.duration_min * 60 ? 'ended' : exam.status,
+        status: exam.status === 'live' && enteredEpoch != null && elapsed >= exam.duration_min * 60 ? 'ended' : exam.status,
         title: exam.title,
-        locked: false,
-        violations: 0,
+        locked: !!sessionRow.locked,
+        violations: parseInt(sessionRow.violations, 10),
         max: parseInt(exam.max_violations, 10),
-        seconds_left: exam.status === 'live' ? Math.max(0, exam.duration_min * 60 - elapsed) : null,
-        entered: !!qId,
+        seconds_left,
+        entered: hasAssigned && enteredEpoch != null,
         session_token: token,
       };
-      if (qId) {
+      if (qId || assignedQuestionsList.length > 0) {
         out.position = qNo;
         if (assignedQuestionsList.length > 0) {
           out.questions = assignedQuestionsList;
@@ -199,11 +232,19 @@ router.get('/state', verifyStudentSession, async (req, res) => {
     const s = req.student;
     let status = s.status;
     const nowEpoch = Math.floor(Date.now() / 1000);
-    const startedEpoch = s.started_at_epoch ? parseInt(s.started_at_epoch, 10) : null;
+    const enteredEpoch = s.entered_at_epoch ? parseInt(s.entered_at_epoch, 10) : null;
 
-    if (status === 'live' && startedEpoch != null && nowEpoch - startedEpoch >= s.duration_min * 60) {
-      await query('UPDATE exams SET status = $1 WHERE id = $2 AND status = $3', ['ended', s.exam_id, 'live']);
-      status = 'ended';
+    let seconds_left = null;
+    if (status === 'live') {
+      if (enteredEpoch == null) {
+        seconds_left = s.duration_min * 60;
+      } else {
+        const elapsed = nowEpoch - enteredEpoch;
+        seconds_left = Math.max(0, s.duration_min * 60 - elapsed);
+        if (elapsed >= s.duration_min * 60) {
+          status = 'ended';
+        }
+      }
     }
 
     const assignedIds = Array.isArray(s.assigned_q_ids) && s.assigned_q_ids.length > 0
@@ -217,8 +258,8 @@ router.get('/state', verifyStudentSession, async (req, res) => {
       locked: !!s.locked,
       violations: parseInt(s.violations, 10),
       max: parseInt(s.max_violations, 10),
-      seconds_left: status === 'live' ? Math.max(0, s.duration_min * 60 - (nowEpoch - startedEpoch)) : null,
-      entered: hasAssigned,
+      seconds_left,
+      entered: hasAssigned && enteredEpoch != null,
     };
 
     if (status === 'live' && !s.locked && hasAssigned) {
@@ -275,10 +316,10 @@ router.post('/violation', verifyStudentSession, async (req, res) => {
     const reason = String(req.body.reason || 'Unknown').substring(0, 100);
 
     const nowEpoch = Math.floor(Date.now() / 1000);
-    const startedEpoch = s.started_at_epoch ? parseInt(s.started_at_epoch, 10) : null;
+    const enteredEpoch = s.entered_at_epoch ? parseInt(s.entered_at_epoch, 10) : null;
 
     const hasAssigned = !!s.q_id || (Array.isArray(s.assigned_q_ids) && s.assigned_q_ids.length > 0);
-    if (s.status === 'live' && !s.locked && hasAssigned && startedEpoch != null && nowEpoch - startedEpoch < s.duration_min * 60) {
+    if (s.status === 'live' && !s.locked && hasAssigned && enteredEpoch != null && nowEpoch - enteredEpoch < s.duration_min * 60) {
       await query('BEGIN');
       try {
         const latest = await query(
