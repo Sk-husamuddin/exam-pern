@@ -19,10 +19,22 @@ const envOrigins = process.env.CORS_ORIGINS
 
 const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (
+    allowedOrigins.includes(origin) ||
+    /^https:\/\/.*\.vercel\.app$/.test(origin) ||
+    /^http:\/\/localhost:\d+$/.test(origin) ||
+    /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || /^https:\/\/exam-pern.*\.vercel\.app$/.test(origin)) {
+    if (isAllowedOrigin(origin)) {
       return callback(null, true);
     }
     return callback(null, false);
@@ -30,6 +42,7 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  maxAge: 86400,
   optionsSuccessStatus: 204,
 };
 
@@ -46,12 +59,24 @@ app.use('/api/faculty', facultyRoutes);
 app.use('/api/student', studentRoutes);
 
 // 404
-app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
+app.use((req, res) => {
+  const origin = req.headers.origin;
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  res.status(404).json({ error: 'Not found' });
+});
 
 // Error handler
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
+  const origin = req.headers.origin;
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
   console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Internal server error' });
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
 module.exports = app;

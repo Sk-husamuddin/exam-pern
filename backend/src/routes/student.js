@@ -217,17 +217,7 @@ router.post('/enter', verifyStudentJwtOrSession, async (req, res) => {
       }
       if (notice) out.notice = notice;
 
-      res.json(out);
-      if (qId || assignedQuestionsList.length > 0) {
-        out.position = qNo;
-        if (assignedQuestionsList.length > 0) {
-          out.questions = assignedQuestionsList;
-          out.question = assignedQuestionsList.map((q) => `Question ${q.position}:\n${q.body}`).join('\n\n');
-        }
-      }
-      if (notice) out.notice = notice;
-
-      res.json(out);
+      return res.json(out);
     } catch (err) {
       await query('ROLLBACK');
       throw err;

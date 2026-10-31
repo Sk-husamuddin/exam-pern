@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost } from '../lib/api.js';
@@ -13,14 +13,21 @@ export default function LiveMonitor() {
 
   const POLL_MS = 3000;
 
+  const failedPollsRef = useRef(0);
+
   async function poll() {
     try {
       const json = await apiGet(`/faculty/state?exam_id=${examId}`);
       setExam((prev) => ({ ...(prev || {}), ...(json && json.exam ? json.exam : {}) }));
       setStudents(Array.isArray(json && json.students) ? json.students : []);
       setError(null);
+      failedPollsRef.current = 0;
     } catch (err) {
-      setError(err.message || 'Poll failed');
+      failedPollsRef.current += 1;
+      // Only show error if initial load failed or 3 consecutive polls failed
+      if (failedPollsRef.current >= 3 || !exam) {
+        setError(err.message || 'Connecting to server…');
+      }
     } finally {
       setLoading(false);
     }
