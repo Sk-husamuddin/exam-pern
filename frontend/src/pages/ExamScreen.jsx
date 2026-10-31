@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE } from '../lib/supabase.js';
 import Loading from '../components/Loading.jsx';
 
 export default function ExamScreen() {
+  const navigate = useNavigate();
   const studentUser = (() => {
     try {
       return JSON.parse(sessionStorage.getItem('exam_student_user') || '{}');
@@ -188,7 +189,7 @@ export default function ExamScreen() {
   async function loadStateAndEnter() {
     const token = sessionStorage.getItem('exam_student_token');
     if (!token) {
-      window.location.href = '/student/login';
+      navigate('/', { replace: true });
       return;
     }
 
@@ -235,7 +236,7 @@ export default function ExamScreen() {
 
     // No student token → redirect to login
     if (!sessionStorage.getItem('exam_student_token')) {
-      window.location.href = '/student/login';
+      navigate('/', { replace: true });
       return;
     }
 
@@ -423,7 +424,7 @@ export default function ExamScreen() {
             <div style={style.card}>
               <h2 style={{ marginTop: 0 }}>Session expired</h2>
               <p style={{ fontSize: 16, color: '#374151' }}>This student session is no longer active. Please sign in again.</p>
-              <Link to="/student/login" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
+              <Link to="/" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
                 Login
               </Link>
             </div>

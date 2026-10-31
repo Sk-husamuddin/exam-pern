@@ -82,7 +82,6 @@ export default function StudentLogin() {
           name="exam_code"
           value={examCode}
           onChange={(e) => setExamCode(e.target.value)}
-          placeholder="e.g. A1B2C3"
           required
         />
         <button type="submit" style={style.btnPrimary} disabled={loading}>

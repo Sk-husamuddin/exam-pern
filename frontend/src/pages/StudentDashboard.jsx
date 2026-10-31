@@ -189,7 +189,9 @@ export default function StudentDashboard() {
               <span style={style.userPill}>{studentName}</span>
               <button
                 onClick={() => {
-                  sendLeaveSignal();
+                  try {
+                    sendLeaveSignal();
+                  } catch (_) {}
                   localStorage.removeItem('exam_student_token');
                   localStorage.removeItem('exam_student_jwt');
                   localStorage.removeItem('exam_student_user');
@@ -199,7 +201,7 @@ export default function StudentDashboard() {
                   sessionStorage.removeItem('exam_student_user');
                   sessionStorage.removeItem('exam_student_code');
                   sessionStorage.removeItem('exam_student_title');
-                  window.location.href = '/student/login';
+                  navigate('/', { replace: true });
                 }}
                 style={style.btnDanger}
                 title="Log out from student session"

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost, apiDelete } from '../lib/api.js';
 import Loading from '../components/Loading.jsx';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BookOpen,
   Clock,
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 export default function FacultyDashboard() {
+  const navigate = useNavigate();
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,6 +37,19 @@ export default function FacultyDashboard() {
   const [flash, setFlash] = useState(null);
   const [creating, setCreating] = useState(false);
   const [copiedCode, setCopiedCode] = useState(null);
+
+  const handleLogout = () => {
+    try {
+      supabase.auth.signOut().catch(() => {});
+    } catch (_) {}
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+        localStorage.removeItem(key);
+      }
+    }
+    navigate('/', { replace: true });
+  };
 
   useEffect(() => {
     fetchExams();
@@ -182,7 +196,7 @@ export default function FacultyDashboard() {
               <span style={style.userRole}>Faculty Account</span>
             </div>
             <button
-              onClick={() => supabase.auth.signOut()}
+              onClick={handleLogout}
               style={style.btnLogout}
               title="Sign out of faculty session"
             >

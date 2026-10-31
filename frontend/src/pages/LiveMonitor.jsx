@@ -14,6 +14,10 @@ export default function LiveMonitor() {
   const POLL_MS = 3000;
 
   const failedPollsRef = useRef(0);
+  const examRef = useRef(null);
+  useEffect(() => {
+    examRef.current = exam;
+  }, [exam]);
 
   async function poll() {
     try {
@@ -25,7 +29,7 @@ export default function LiveMonitor() {
     } catch (err) {
       failedPollsRef.current += 1;
       // Only show error if initial load failed or 3 consecutive polls failed
-      if (failedPollsRef.current >= 3 || !exam) {
+      if (failedPollsRef.current >= 3 || !examRef.current) {
         setError(err.message || 'Connecting to server…');
       }
     } finally {
@@ -46,7 +50,7 @@ export default function LiveMonitor() {
           setExam((prev) => ({ ...detail.exam, ...(prev || {}) }));
         }
       } catch (err) {
-        if (mounted) setError(err.message || 'Failed to load exam details');
+        if (mounted && !examRef.current) setError(err.message || 'Failed to load exam details');
       }
     })();
 

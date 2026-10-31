@@ -36,7 +36,7 @@ export async function apiRequest(path, options = {}) {
       // Refresh failed — sign out and redirect
       await supabase.auth.signOut();
       if (typeof window !== 'undefined') {
-        window.location.href = '/faculty/login';
+        window.location.href = '/';
       }
       throw new Error('Session expired. Please sign in again.');
     }
