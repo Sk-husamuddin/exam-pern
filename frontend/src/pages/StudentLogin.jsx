@@ -24,8 +24,8 @@ export default function StudentLogin() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || 'Invalid roll number or password');
 
-      localStorage.setItem('exam_student_jwt', json.studentJwt);
-      localStorage.setItem('exam_student_user', JSON.stringify(json.user));
+      sessionStorage.setItem('exam_student_jwt', json.studentJwt);
+      sessionStorage.setItem('exam_student_user', JSON.stringify(json.user));
 
       // Step 2: immediately join exam by code (reuses PHP logic of login.php)
       const joinRes = await fetch(`${API_BASE}/student/enter`, {
@@ -42,8 +42,8 @@ export default function StudentLogin() {
         return;
       }
       // Store the session token returned by /enter (stored in exam_sessions.token)
-      localStorage.setItem('exam_student_code', examCode.trim().toUpperCase());
-      localStorage.setItem('exam_student_token', joinJson.session_token);
+      sessionStorage.setItem('exam_student_code', examCode.trim().toUpperCase());
+      sessionStorage.setItem('exam_student_token', joinJson.session_token);
       if (joinJson.status === 'live') {
         navigate('/student/exam');
       } else {

@@ -11,7 +11,7 @@ export default function StudentDashboard() {
   const POLL_MS = 3000;
 
   async function authHeaders() {
-    const token = localStorage.getItem('exam_student_token');
+    const token = sessionStorage.getItem('exam_student_token');
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
@@ -21,7 +21,7 @@ export default function StudentDashboard() {
         headers: await authHeaders(),
       });
       if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem('exam_student_token');
+        sessionStorage.removeItem('exam_student_token');
         window.location.href = '/student/login';
         return;
       }
@@ -40,7 +40,7 @@ export default function StudentDashboard() {
   }
 
   function sendLeaveSignal() {
-    const token = localStorage.getItem('exam_student_token');
+    const token = sessionStorage.getItem('exam_student_token');
     if (!token) return;
     try {
       const url = `${API_BASE}/student/leave`;

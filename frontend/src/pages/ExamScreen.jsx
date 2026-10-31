@@ -6,7 +6,6 @@ import Loading from '../components/Loading.jsx';
 export default function ExamScreen() {
   const [data, setData] = useState(null);
   const [warning, setWarning] = useState('');
-  const [backendDown, setBackendDown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [armed, setArmed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
@@ -39,23 +38,6 @@ export default function ExamScreen() {
   async function jwtAuthHeaders() {
     const token = sessionStorage.getItem('exam_student_jwt');
     return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
-  async function checkBackendHealth() {
-    try {
-      const res = await fetch(`${API_BASE}/health`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(3000),
-      });
-      if (!res.ok) throw new Error('Health check failed');
-      const json = await res.json();
-      if (!json.ok) throw new Error('Service unhealthy');
-      setBackendDown(false);
-      return true;
-    } catch (_) {
-      setBackendDown(true);
-      return false;
-    }
   }
 
   async function getJson(url, options = {}) {
@@ -97,8 +79,6 @@ export default function ExamScreen() {
       question: d.question != null ? d.question : prev?.question,
       position: d.position != null ? d.position : prev?.position,
     }));
-    setBackendDown(false);
-
     if (d.seconds_left != null && d.status === 'live') {
       setDeadline(Date.now() + d.seconds_left * 1000);
       setTimeLeftStr(fmt(d.seconds_left));
@@ -130,13 +110,6 @@ export default function ExamScreen() {
 
   async function fetchState() {
     try {
-      const healthy = await checkBackendHealth();
-      if (!healthy) {
-        setWarning('Connection problem: Backend server is not reachable on port 5000.');
-        return;
-      }
-      setBackendDown(false);
-
       const isActive =
         !document.hidden &&
         !!document.fullscreenElement &&
@@ -390,12 +363,6 @@ export default function ExamScreen() {
           </span>
         </div>
       </header>
-
-      {backendDown && (
-        <div style={style.alertErr}>
-          <b>Backend not reachable:</b> The exam server on port 5000 is not running. Please start the backend and refresh this page.
-        </div>
-      )}
 
       {loading && <Loading message="Connecting to exam server…" />}
 

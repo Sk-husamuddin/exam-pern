@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Check, Eye, EyeOff, FileSpreadsheet, Fullscreen, LockKeyhole, MonitorCheck, Play, ShieldCheck, Users, Wifi } from 'lucide-react';
 import { Button, FAQ, FormField, Icon, Logo, StatusBadge, featureItems } from '../components/ui.jsx';
-import { supabase } from '../lib/supabase.js';
+import { supabase, AUTH_BASE, API_BASE } from '../lib/supabase.js';
 
 // Usage: render <LandingPage /> at route "/".
 export function LandingPage() { return <div className="landing"><header className="landing-nav"><Logo /><nav className="desktop-nav"><a href="#features">Features</a><a href="#how-it-works">How it works</a></nav><div className="nav-actions"><a className="nav-login" href="/faculty/login">Faculty login</a><Button href="/student/login" variant="secondary">Student login</Button></div></header><main><section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="eyebrow-dot" />Built for academic integrity</div><h1>Run secure online exams, <em>with live monitoring</em></h1><p>Smart Exam Platform gives colleges a calm, dependable way to create, deliver, and monitor assessments from anywhere.</p><div className="hero-actions"><Button href="/student/login" icon={ArrowRight}>I&apos;m a Student</Button><Button href="/faculty/login" variant="outline">I&apos;m Faculty</Button></div><div className="hero-proof"><div className="proof-avatars"><span>AK</span><span>MR</span><span>+</span></div><span>Trusted by faculty teams who value fair exams</span></div></div><div className="hero-visual"><div className="hero-glow" /><MonitorPreview /></div></section><section className="section section-muted" id="features"><div className="section-heading"><span className="eyebrow">Confidence by design</span><h2>Everything you need to run a fair exam</h2><p>Simple tools for the moments that matter before, during, and after an assessment.</p></div><div className="feature-grid">{featureItems.map(({ icon: I, title, text }) => <article className="feature-card" key={title}><div className="feature-icon"><I size={21} /></div><h3>{title}</h3><p>{text}</p></article>)}</div></section><section className="section how-section" id="how-it-works"><div className="section-heading"><span className="eyebrow">A clear workflow</span><h2>From setup to submitted in three steps</h2></div><div className="steps"><Step n="01" title="Create exam" text="Build your paper, set rules, and choose your monitoring settings." /><Step n="02" title="Share 6-character code" text="Students sign in with their roll number and the secure exam code." /><Step n="03" title="Monitor live" text="Watch progress, resolve issues, and keep the room moving." /></div></section><section className="section faq-section"><div className="section-heading"><span className="eyebrow">Questions, answered</span><h2>Designed for confidence</h2></div><div className="faq-list"><FAQ question="Can students take exams on mobile?" answer="Yes. The student experience is responsive and optimized for modern phones, tablets, and laptops." /><FAQ question="What happens if a student leaves fullscreen?" answer="The session records the event and can automatically lock the attempt based on your exam policy." /><FAQ question="Can I bring existing question banks?" answer="Yes. Faculty can import DOCX and Excel files, then review questions before publishing." /></div></section></main><footer className="footer"><Logo /><span>© 2025 Smart Exam Platform</span><div><a href="#features">Features</a><a href="#how-it-works">How it works</a><a href="/faculty/login">Faculty access</a></div></footer></div> }
@@ -197,6 +198,7 @@ export function StudentAuth() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const clearError = () => setError('');
 
@@ -214,7 +216,7 @@ export function StudentAuth() {
     } catch (_) {}
 
     try {
-      const res = await fetch('/auth/student/login', {
+      const res = await fetch(`${AUTH_BASE}/student/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -224,10 +226,7 @@ export function StudentAuth() {
       if (!res.ok) throw new Error(json.error || `Login failed (${res.status})`);
       if (!json.ok) throw new Error(json.error || 'Invalid roll number or password');
 
-      localStorage.setItem('exam_student_jwt', json.studentJwt);
-      localStorage.setItem('exam_student_user', JSON.stringify(json.user));
-
-      const enterRes = await fetch('/api/student/enter', {
+      const enterRes = await fetch(`${API_BASE}/student/enter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${json.studentJwt}` },
         body: JSON.stringify({ exam_code: code }),
@@ -244,7 +243,7 @@ export function StudentAuth() {
       sessionStorage.setItem('exam_student_code', code.trim().toUpperCase());
       sessionStorage.setItem('exam_student_title', enterJson.title || '');
 
-      window.location.href = '/student/exam';
+      navigate('/student/exam');
     } catch (err) {
       if (document.fullscreenElement) {
         try { document.exitFullscreen(); } catch (_) {}
