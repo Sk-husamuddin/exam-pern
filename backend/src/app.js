@@ -1,8 +1,10 @@
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const authRoutes = require('./routes/auth');
 const facultyRoutes = require('./routes/faculty');
 const studentRoutes = require('./routes/student');
+const { pool } = require('./db');
 
 const app = express();
 
@@ -48,10 +50,35 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json({ limit: '10mb' }));
+app.use(compression());
+app.use(express.json({ limit: '5mb' }));
 
-// Health
-app.get('/health', (_req, res) => res.json({ ok: true, service: 'exam-pern-backend' }));
+// Request timing logger for enter
+app.use('/api/student/enter', (req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const dur = Date.now() - start;
+    if (dur > 500) {
+      console.log(`[POST /api/student/enter] status=${res.statusCode} duration=${dur}ms`);
+    }
+  });
+  next();
+});
+
+// Lightweight Health check
+app.get('/health', (_req, res) => res.json({ ok: true, service: 'exam-pern-backend', time: new Date().toISOString() }));
+
+// Database connection health check
+app.get('/health/db', async (_req, res) => {
+  try {
+    const t0 = Date.now();
+    await pool.query('SELECT 1');
+    const latencyMs = Date.now() - t0;
+    res.json({ ok: true, latency_ms: latencyMs });
+  } catch (err) {
+    res.status(503).json({ ok: false, error: err.message });
+  }
+});
 
 // API routes
 app.use('/auth', authRoutes);
