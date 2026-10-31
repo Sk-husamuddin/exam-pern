@@ -433,9 +433,9 @@ export default function ExamScreen() {
               <div
                 data-testid="studentExamBadge"
                 style={{
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 8,
+                  background: '#18181B',
+                  border: '1px solid #27272A',
+                  borderRadius: 0,
                   padding: '12px 18px',
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -446,12 +446,12 @@ export default function ExamScreen() {
                 }}
               >
                 <div>
-                  <span style={{ color: '#64748b', marginRight: 6 }}>Student Name:</span>
-                  <strong style={{ color: '#0f172a' }}>{studentName}</strong>
+                  <span style={{ color: '#A1A1AA', marginRight: 6 }}>Student Name:</span>
+                  <strong style={{ color: '#FFFFFF' }}>{studentName}</strong>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', marginRight: 6 }}>Roll Number:</span>
-                  <strong style={{ color: '#0f172a' }}>{studentRollNo || '—'}</strong>
+                  <span style={{ color: '#A1A1AA', marginRight: 6 }}>Roll Number:</span>
+                  <strong style={{ color: '#FFFFFF' }}>{studentRollNo || '—'}</strong>
                 </div>
               </div>
 
@@ -522,50 +522,56 @@ export default function ExamScreen() {
 }
 
 const style = {
-  examRoot: { fontFamily: 'system-ui, sans-serif' },
+  examRoot: { fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#0A0A0A', minHeight: '100vh', color: '#FFFFFF' },
   bar: {
-    background: '#1d2433', color: '#fff', padding: '12px 24px',
+    background: '#121212', color: '#FFFFFF', padding: '14px 24px',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    borderBottom: '1px solid #27272A',
   },
-  timer: { fontSize: 20, fontWeight: 'bold' },
+  timer: { fontSize: 20, fontWeight: 800, color: '#FF1818', fontFamily: 'ui-monospace, monospace' },
   main: { maxWidth: 900, margin: '30px auto', padding: '0 20px' },
-  muted: { color: '#6b7280' },
+  muted: { color: '#A1A1AA' },
   card: {
-    background: '#fff', borderRadius: 10, padding: 28,
-    boxShadow: '0 2px 10px rgba(0,0,0,.08)',
+    background: '#121212', borderRadius: 0, padding: 28,
+    border: '1px solid #27272A', color: '#FFFFFF',
+    boxShadow: 'none',
   },
   question: {
     whiteSpace: 'pre-wrap', fontSize: 18, lineHeight: 1.65,
-    background: '#fff', padding: 24, borderRadius: 10,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+    background: '#18181B', padding: 24, borderRadius: 0,
+    border: '1px solid #27272A', color: '#FFFFFF',
+    boxShadow: 'none',
   },
   btnPrimaryLink: {
     display: 'inline-block',
-    background: '#2b5cff',
-    color: '#fff',
+    background: '#FF1818',
+    color: '#FFFFFF',
+    border: '1px solid #FF1818',
     padding: '9px 18px',
-    borderRadius: 6,
+    borderRadius: 0,
     textDecoration: 'none',
     fontSize: 14,
-    fontWeight: 600,
+    fontWeight: 700,
     marginTop: 14,
   },
   overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(20,25,40,.92)',
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 99, textAlign: 'center', color: '#fff', fontFamily: 'system-ui, sans-serif',
+    zIndex: 99, textAlign: 'center', color: '#FFFFFF', fontFamily: 'Inter, system-ui, sans-serif',
   },
-  overlayCard: { maxWidth: 420, background: 'rgba(255,255,255,.08)', padding: 28, borderRadius: 12 },
+  overlayCard: { maxWidth: 420, background: '#121212', border: '1px solid #27272A', padding: 28, borderRadius: 0 },
   btn: {
-    background: '#2b5cff', color: '#fff', border: 'none', padding: '10px 18px',
-    borderRadius: 6, cursor: 'pointer', fontSize: 14, marginTop: 10, fontWeight: 600,
+    background: '#FF1818', color: '#FFFFFF', border: '1px solid #FF1818', padding: '10px 18px',
+    borderRadius: 0, cursor: 'pointer', fontSize: 14, marginTop: 10, fontWeight: 700,
   },
   alert: {
-    background: '#fde8e8', color: '#9b1c1c', padding: '10px 14px',
-    borderRadius: 6, margin: '14px 20px 0', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
+    background: '#141414', border: '1px solid #27272A', borderLeft: '3px solid #FF1818',
+    color: '#FFFFFF', padding: '10px 14px',
+    borderRadius: 0, margin: '14px 20px 0', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
   },
   alertErr: {
-    background: '#fde8e8', color: '#9b1c1c', padding: '10px 14px',
-    borderRadius: 6, margin: '14px 20px 0', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
+    background: '#141414', border: '1px solid #27272A', borderLeft: '3px solid #FF1818',
+    color: '#FFFFFF', padding: '10px 14px',
+    borderRadius: 0, margin: '14px 20px 0', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
   },
 };
