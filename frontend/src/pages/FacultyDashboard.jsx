@@ -31,7 +31,7 @@ export default function FacultyDashboard() {
   const [selected, setSelected] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [selStudents, setSelStudents] = useState(0);
-  const [form, setForm] = useState({ title: '', duration: 60, max_violations: 3 });
+  const [form, setForm] = useState({ title: '', duration: 60, max_violations: 3, questions_to_students: 1 });
   const [showCreate, setShowCreate] = useState(false);
   const [flash, setFlash] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -52,6 +52,7 @@ export default function FacultyDashboard() {
       sc: Number(e.sc) || 0,
       duration_min: Number(e.duration_min) || 60,
       max_violations: Number(e.max_violations) || 3,
+      questions_to_students: Number(e.questions_per_student) || 1,
       started_at: e.started_at,
     };
   };
@@ -82,11 +83,12 @@ export default function FacultyDashboard() {
         title: form.title,
         duration: form.duration,
         max_violations: form.max_violations,
+        questions_to_students: form.questions_to_students,
       });
       if (json && json.ok) {
         setFlash({ type: 'ok', msg: json.message || 'Exam created successfully!' });
         setShowCreate(false);
-        setForm({ title: '', duration: 60, max_violations: 3 });
+        setForm({ title: '', duration: 60, max_violations: 3, questions_to_students: 1 });
         await fetchExams();
       } else {
         setFlash({ type: 'err', msg: json && json.error ? json.error : 'Create failed' });
@@ -364,6 +366,29 @@ export default function FacultyDashboard() {
                         />
                       </div>
                       <span style={style.fieldHint}>Auto-locks after tab switch or exit</span>
+                    </div>
+
+                    {/* No. of questions to students Field */}
+                    <div style={style.formField}>
+                      <label htmlFor="exam-questions-to-students" style={style.inputLabel}>
+                        No. of questions to students: <span style={style.requiredStar}>*</span>
+                      </label>
+                      <div style={style.inputWithIcon}>
+                        <BookOpen size={16} style={style.inputPrefixIcon} />
+                        <input
+                          id="exam-questions-to-students"
+                          style={{ ...style.input, paddingLeft: 36 }}
+                          type="number"
+                          name="questions_to_students"
+                          value={form.questions_to_students}
+                          onChange={(e) => setForm({ ...form, questions_to_students: e.target.value })}
+                          min="1"
+                          max="50"
+                          placeholder="2"
+                          required
+                        />
+                      </div>
+                      <span style={style.fieldHint}>e.g. 2 means 2 questions are given to each student</span>
                     </div>
                   </div>
 

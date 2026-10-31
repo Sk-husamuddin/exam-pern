@@ -178,7 +178,7 @@ async function verifyStudentSession(req, res, next) {
     }
 
     const { rows } = await query(
-      `SELECT s.*, p.username, p.name, e.title, e.code, e.status, e.duration_min, e.max_violations,
+      `SELECT s.*, p.username, p.name, e.title, e.code, e.status, e.duration_min, e.max_violations, e.questions_per_student,
               EXTRACT(EPOCH FROM (e.started_at AT TIME ZONE 'UTC')) as started_at_epoch
        FROM exam_sessions s
        JOIN profiles p ON p.id = s.user_id

@@ -45,13 +45,14 @@ router.get('/exams', verifyFaculty, async (req, res) => {
 // ------------------------------------------------------------------
 router.post('/exams', verifyFaculty, async (req, res) => {
   try {
-    const { title, duration = 60, max_violations = 3 } = req.body;
+    const { title, duration = 60, max_violations = 3, questions_to_students = 1, questions_per_student = 1 } = req.body;
     if (!title || title.trim() === '') {
       return res.status(400).json({ error: 'Exam title is required' });
     }
 
     const dur = Math.max(1, Math.min(600, parseInt(duration, 10) || 60));
     const mv = Math.max(1, Math.min(20, parseInt(max_violations, 10) || 3));
+    const qps = Math.max(1, Math.min(50, parseInt(questions_to_students || questions_per_student, 10) || 1));
 
     let code;
     let inserted = false;
@@ -59,14 +60,14 @@ router.post('/exams', verifyFaculty, async (req, res) => {
       code = crypto.randomBytes(4).toString('hex').toUpperCase().substring(0, 6);
       try {
         const { rows } = await query(
-          `INSERT INTO exams (code, title, faculty_id, duration_min, max_violations)
-           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-          [code, title.trim(), req.faculty.id, dur, mv]
+          `INSERT INTO exams (code, title, faculty_id, duration_min, max_violations, questions_per_student)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+          [code, title.trim(), req.faculty.id, dur, mv, qps]
         );
         inserted = true;
         res.json({
           ok: true,
-          exam: { id: rows[0].id, code, title: title.trim(), duration_min: dur, max_violations: mv },
+          exam: { id: rows[0].id, code, title: title.trim(), duration_min: dur, max_violations: mv, questions_per_student: qps },
           message: 'Exam created. Now add questions.',
         });
         break;

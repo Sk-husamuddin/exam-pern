@@ -77,6 +77,7 @@ export default function ExamScreen() {
       ...d,
       entered: d.entered != null ? d.entered : (prev?.entered ?? false),
       question: d.question != null ? d.question : prev?.question,
+      questions: d.questions != null ? d.questions : prev?.questions,
       position: d.position != null ? d.position : prev?.position,
     }));
     if (d.seconds_left != null && d.status === 'live') {
@@ -402,11 +403,31 @@ export default function ExamScreen() {
               </Link>
             </div>
           ) : readyToShowQuestion ? (
-            <div>
-              <h2 style={{ marginBottom: 16 }}>Question {data.position || ''}</h2>
-              <div style={style.question}>
-                {data.question || 'No question has been assigned yet. Please contact faculty.'}
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {Array.isArray(data.questions) && data.questions.length > 0 ? (
+                data.questions.map((q, idx) => (
+                  <div key={q.id || idx}>
+                    <h2 style={{ marginBottom: 12, color: '#1e293b', fontSize: 20 }}>
+                      Question {q.position != null ? q.position : idx + 1}
+                      {data.questions.length > 1 && (
+                        <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b', marginLeft: 10 }}>
+                          ({idx + 1} of {data.questions.length})
+                        </span>
+                      )}
+                    </h2>
+                    <div style={style.question}>
+                      {q.body || q.question}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div>
+                  <h2 style={{ marginBottom: 16 }}>Question {data.position || ''}</h2>
+                  <div style={style.question}>
+                    {data.question || 'No question has been assigned yet. Please contact faculty.'}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div style={style.card}>

@@ -92,39 +92,69 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
 
       let qId = null;
       let qNo = 0;
+      let assignedQuestionsList = [];
 
       if (exam.status === 'live' && elapsed < exam.duration_min * 60) {
         // Re-check assignment inside transaction
-        const cur = await query('SELECT q_id FROM exam_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
+        const cur = await query('SELECT q_id, assigned_q_ids FROM exam_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
         const assigned = cur.rows[0];
-        if (!assigned.q_id) {
+        const numQuestions = Math.max(1, parseInt(exam.questions_per_student, 10) || 1);
+        const hasAssigned = !!assigned.q_id || (Array.isArray(assigned.assigned_q_ids) && assigned.assigned_q_ids.length > 0);
+
+        if (!hasAssigned) {
           const qs = await query(
-            `SELECT q.id, COUNT(es.id) AS c
+            `SELECT q.id, q.q_no, q.body,
+                    COUNT(es.id) AS c
              FROM questions q
-             LEFT JOIN exam_sessions es ON es.q_id = q.id AND es.exam_id = $1
+             LEFT JOIN exam_sessions es ON (es.q_id = q.id OR q.id = ANY(es.assigned_q_ids)) AND es.exam_id = $1
              WHERE q.exam_id = $1
-             GROUP BY q.id`,
+             GROUP BY q.id, q.q_no, q.body
+             ORDER BY c ASC, RANDOM()`,
             [exam.id]
           );
+
           if (qs.rows.length > 0) {
-            const counts = qs.rows.map((r) => parseInt(r.c, 10));
-            const min = Math.min(...counts);
-            const pool = qs.rows.filter((r) => parseInt(r.c, 10) === min).map((r) => parseInt(r.id, 10));
-            const pick = pool[Math.floor(Math.random() * pool.length)];
+            const countToPick = Math.min(numQuestions, qs.rows.length);
+            const picked = qs.rows.slice(0, countToPick);
+            picked.sort((a, b) => parseInt(a.q_no, 10) - parseInt(b.q_no, 10));
+
+            const pickIds = picked.map((q) => parseInt(q.id, 10));
+            const firstPick = pickIds[0];
+
             await query(
-              'UPDATE exam_sessions SET q_id = $1, entered_at = now() WHERE id = $2 AND q_id IS NULL',
-              [pick, sessionId]
+              'UPDATE exam_sessions SET q_id = $1, assigned_q_ids = $2, entered_at = now() WHERE id = $3',
+              [firstPick, pickIds, sessionId]
             );
-            qId = pick;
-            const qrow = await query('SELECT q_no FROM questions WHERE id = $1', [pick]);
-            qNo = qrow.rows.length > 0 ? parseInt(qrow.rows[0].q_no, 10) : 0;
+
+            qId = firstPick;
+            qNo = parseInt(picked[0].q_no, 10);
+            assignedQuestionsList = picked.map((q) => ({
+              id: q.id,
+              position: parseInt(q.q_no, 10),
+              body: q.body,
+            }));
           } else {
             notice = 'No questions have been set for this exam. Please inform the faculty.';
           }
         } else {
-          qId = parseInt(assigned.q_id, 10);
-          const qrow = await query('SELECT q_no FROM questions WHERE id = $1', [qId]);
-          qNo = qrow.rows.length > 0 ? parseInt(qrow.rows[0].q_no, 10) : 0;
+          const assignedIds = Array.isArray(assigned.assigned_q_ids) && assigned.assigned_q_ids.length > 0
+            ? assigned.assigned_q_ids
+            : [assigned.q_id];
+
+          const qrows = await query(
+            'SELECT id, q_no, body FROM questions WHERE id = ANY($1) AND exam_id = $2 ORDER BY q_no ASC',
+            [assignedIds, exam.id]
+          );
+
+          if (qrows.rows.length > 0) {
+            qId = parseInt(qrows.rows[0].id, 10);
+            qNo = parseInt(qrows.rows[0].q_no, 10);
+            assignedQuestionsList = qrows.rows.map((q) => ({
+              id: q.id,
+              position: parseInt(q.q_no, 10),
+              body: q.body,
+            }));
+          }
         }
       }
 
@@ -140,7 +170,13 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
         entered: !!qId,
         session_token: token,
       };
-      if (qId) out.position = qNo;
+      if (qId) {
+        out.position = qNo;
+        if (assignedQuestionsList.length > 0) {
+          out.questions = assignedQuestionsList;
+          out.question = assignedQuestionsList.map((q) => `Question ${q.position}:\n${q.body}`).join('\n\n');
+        }
+      }
       if (notice) out.notice = notice;
 
       res.json(out);
@@ -180,11 +216,23 @@ router.get('/state', verifyStudentSession, async (req, res) => {
       entered: !!s.q_id,
     };
 
-    if (status === 'live' && !s.locked && s.q_id) {
-      const q = await query('SELECT q_no, body FROM questions WHERE id = $1 AND exam_id = $2', [s.q_id, s.exam_id]);
-      if (q.rows.length > 0) {
-        out.position = parseInt(q.rows[0].q_no, 10);
-        out.question = q.rows[0].body;
+    const assignedIds = Array.isArray(s.assigned_q_ids) && s.assigned_q_ids.length > 0
+      ? s.assigned_q_ids
+      : (s.q_id ? [s.q_id] : []);
+
+    if (status === 'live' && !s.locked && assignedIds.length > 0) {
+      const qRows = await query(
+        'SELECT id, q_no, body FROM questions WHERE id = ANY($1) AND exam_id = $2 ORDER BY q_no ASC',
+        [assignedIds, s.exam_id]
+      );
+      if (qRows.rows.length > 0) {
+        out.questions = qRows.rows.map((r) => ({
+          id: r.id,
+          position: parseInt(r.q_no, 10),
+          body: r.body,
+        }));
+        out.position = out.questions[0].position;
+        out.question = out.questions.map((q) => `Question ${q.position}:\n${q.body}`).join('\n\n');
       } else {
         out.question = 'Question not found. Please inform the faculty.';
       }
