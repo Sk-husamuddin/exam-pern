@@ -1,12 +1,10 @@
 import React from 'react';
+import Clock from './ui/clock';
 
 /**
- * Full-page loading indicator.
- *
- * The spinner styling lives in `src/styles.css` (imported once in main.jsx)
- * so it is available even when only the inline spinner is rendered.
+ * Full-page loading indicator using the Swiss Red animated Clock spinner.
  */
-export default function Loading({ message = 'Loading…' }) {
+export default function Loading({ message = 'Loading…', size = 52, color = '#FF1818' }) {
   return (
     <div
       role="status"
@@ -16,22 +14,24 @@ export default function Loading({ message = 'Loading…' }) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        height: '60vh',
-        gap: 12,
+        minHeight: '55vh',
+        gap: 16,
+        padding: '40px 20px',
+        color: '#FFFFFF',
       }}
     >
-      <div className="exam-spinner" />
-      <p style={{ color: '#6b7280', fontSize: 16, margin: 0 }}>{message}</p>
+      <Clock size={size} color={color} />
+      <p style={{ color: '#A1A1AA', fontSize: 15, margin: 0, fontWeight: 600, letterSpacing: '-0.01em' }}>
+        {message}
+      </p>
     </div>
   );
 }
 
-/** Small inline spinner for buttons and inline actions. */
+/** Small inline spinner for buttons and inline actions using Clock. */
 export function InlineSpinner({ size = 'sm', light = false }) {
-  const cls = ['exam-spinner', size === 'sm' ? 'exam-spinner--sm' : '', light ? 'exam-spinner--light' : '']
-    .filter(Boolean)
-    .join(' ');
-  return <span className={cls} aria-hidden="true" />;
+  const px = size === 'sm' ? 16 : 22;
+  return <Clock size={px} color={light ? '#FFFFFF' : 'currentColor'} />;
 }
 
 /**
