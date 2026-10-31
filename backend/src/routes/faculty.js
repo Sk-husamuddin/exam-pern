@@ -425,17 +425,25 @@ router.delete('/questions/:qId', verifyFaculty, async (req, res) => {
 
     await query('BEGIN');
     try {
-      await query(
+      const delRes = await query(
         `DELETE FROM questions q
          USING exams e
-         WHERE q.id = $1 AND q.exam_id = e.id AND e.faculty_id = $2 AND e.status = 'draft'`,
+         WHERE q.id = $1 AND q.exam_id = e.id AND e.faculty_id = $2 AND e.status = 'draft'
+         RETURNING q.exam_id`,
         [qId, req.faculty.id]
       );
 
+      if (delRes.rows.length === 0) {
+        await query('ROLLBACK');
+        return res.status(404).json({ error: 'Question not found or exam not in draft' });
+      }
+
+      const examId = delRes.rows[0].exam_id;
+
       // Renumber remaining questions 1..n
       const { rows } = await query(
-        'SELECT id FROM questions WHERE exam_id = (SELECT exam_id FROM questions WHERE id = $1) ORDER BY q_no',
-        [qId]
+        'SELECT id FROM questions WHERE exam_id = $1 ORDER BY q_no',
+        [examId]
       );
       let i = 1;
       for (const row of rows) {
@@ -550,15 +558,17 @@ router.post('/students/import', verifyFaculty, uploadStudent.single('file'), asy
         if (!/^[A-Za-z0-9._@-]{1,50}$/.test(u)) { skipped.push(u); continue; }
         const fullName = n || u;
         const hash = await bcrypt.hash(u, 8);
-        try {
-          await query(
-            `INSERT INTO profiles (username, name, password_hash, role) VALUES ($1, $2, $3, 'student')`,
-            [u, fullName, hash]
-          );
+        const ins = await query(
+          `INSERT INTO profiles (username, name, password_hash, role)
+           VALUES ($1, $2, $3, 'student')
+           ON CONFLICT (username) DO NOTHING
+           RETURNING id`,
+          [u, fullName, hash]
+        );
+        if (ins.rows.length > 0) {
           ok++;
-        } catch (err) {
-          if (err.code === '23505') skipped.push(u);
-          else throw err;
+        } else {
+          skipped.push(u);
         }
       }
       await query('COMMIT');
@@ -712,9 +722,10 @@ router.get('/state', verifyFaculty, async (req, res) => {
 
     const ONLINE_SEC = 8; // 8 seconds threshold for 3s polling heartbeat
     const rows = await query(
-      `SELECT s.id AS sid, p.username, p.name, s.login_order, s.login_time, s.violations, s.locked,
+      `SELECT s.id AS sid, p.username, p.name, s.login_order, s.login_time, s.violations, s.locked, s.assigned_q_ids,
               q.q_no AS position, q.body AS question_text,
-              (s.q_id IS NOT NULL AND (EXTRACT(EPOCH FROM (now() - s.last_seen)) < $2) AND NOT s.locked) AS online,
+              ARRAY(SELECT q_no FROM questions WHERE id = ANY(s.assigned_q_ids) ORDER BY q_no) AS assigned_qnos,
+              ((s.q_id IS NOT NULL OR (s.assigned_q_ids IS NOT NULL AND array_length(s.assigned_q_ids, 1) > 0)) AND (EXTRACT(EPOCH FROM (now() - s.last_seen)) < $2) AND NOT s.locked) AS online,
               (SELECT reason FROM violation_log v WHERE v.session_id = s.id ORDER BY v.id DESC LIMIT 1) AS last_reason
        FROM exam_sessions s
        JOIN profiles p ON p.id = s.user_id
@@ -724,19 +735,27 @@ router.get('/state', verifyFaculty, async (req, res) => {
       [exam_id, ONLINE_SEC]
     );
 
-    const students = rows.rows.map(r => ({
-      sid: r.sid,
-      username: r.username,
-      name: r.name,
-      login_order: r.login_order,
-      login_time: r.login_time,
-      violations: parseInt(r.violations, 10),
-      locked: !!r.locked,
-      position: r.position != null ? parseInt(r.position, 10) : 0,
-      question_text: r.question_text || '',
-      online: !!r.online,
-      last_reason: r.last_reason || '',
-    }));
+    const students = rows.rows.map(r => {
+      const qnos = Array.isArray(r.assigned_qnos) && r.assigned_qnos.length > 0
+        ? r.assigned_qnos
+        : (r.position != null ? [r.position] : []);
+      const positionStr = qnos.length > 0 ? qnos.map(n => `Q${n}`).join(', ') : '';
+
+      return {
+        sid: r.sid,
+        username: r.username,
+        name: r.name,
+        login_order: r.login_order,
+        login_time: r.login_time,
+        violations: parseInt(r.violations, 10),
+        locked: !!r.locked,
+        position: r.position != null ? parseInt(r.position, 10) : 0,
+        position_str: positionStr,
+        question_text: r.question_text || '',
+        online: !!r.online,
+        last_reason: r.last_reason || '',
+      };
+    });
 
     res.json({
       exam: {
@@ -763,7 +782,9 @@ router.get('/exams/:examId/export-assignments', verifyFaculty, async (req, res) 
     if (exam.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
 
     const { rows } = await query(
-      `SELECT p.username, p.name, q.q_no AS position, q.body AS question_text,
+      `SELECT p.username, p.name, s.assigned_q_ids, q.q_no AS position, q.body AS question_text,
+              ARRAY(SELECT q_no FROM questions WHERE id = ANY(s.assigned_q_ids) ORDER BY q_no) AS assigned_qnos,
+              (SELECT string_agg(body, E'\n---\n' ORDER BY q_no) FROM questions WHERE id = ANY(s.assigned_q_ids)) AS all_question_texts,
               s.login_time, s.violations, s.locked
        FROM exam_sessions s
        JOIN profiles p ON p.id = s.user_id
@@ -781,11 +802,17 @@ router.get('/exams/:examId/export-assignments', verifyFaculty, async (req, res) 
 
     const csvLines = [headers.map(escapeCsv).join(',')];
     for (const r of rows) {
+      const qnos = Array.isArray(r.assigned_qnos) && r.assigned_qnos.length > 0
+        ? r.assigned_qnos
+        : (r.position ? [r.position] : []);
+      const qnoStr = qnos.length > 0 ? qnos.map((n) => `Q${n}`).join(', ') : 'Not Assigned';
+      const qText = r.all_question_texts || r.question_text || 'Not Assigned';
+
       csvLines.push([
         r.username,
         r.name,
-        r.position ? `Q${r.position}` : 'Not Assigned',
-        r.question_text || 'Not Assigned',
+        qnoStr,
+        qText,
         r.violations,
         r.locked ? 'Locked' : 'Active',
         r.login_time ? new Date(r.login_time).toLocaleString() : '',
@@ -854,10 +881,33 @@ function parseXlsx(buffer) {
 
 function parseCsv(buffer) {
   const text = buffer.toString('utf-8').replace(/^\uFEFF/, '');
-  const lines = text.split(/\r?\n/);
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
   if (lines.length === 0) return [];
   const delim = lines[0].includes(';') ? ';' : ',';
-  return lines.map((line) => line.split(delim).map((c) => c.trim()));
+
+  return lines.map((line) => {
+    const row = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === delim && !inQuotes) {
+        row.push(cur.trim());
+        cur = '';
+      } else {
+        cur += char;
+      }
+    }
+    row.push(cur.trim());
+    return row;
+  });
 }
 
 module.exports = router;

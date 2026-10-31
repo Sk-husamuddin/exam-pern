@@ -98,7 +98,7 @@ export default function LiveMonitor() {
     const rows = students.map((s) => [
       s && s.username,
       s && s.name,
-      s && s.position ? `Q${s.position}` : 'Not Entered',
+      s && (s.position_str || (s.position ? `Q${s.position}` : 'Not Entered')),
       s && s.question_text ? s.question_text : (s && s.position ? `Question ${s.position}` : 'Not Entered'),
       s && s.violations != null ? s.violations : 0,
       s && s.locked ? 'Locked' : s && s.online ? 'Online' : 'Offline',
@@ -268,7 +268,7 @@ export default function LiveMonitor() {
                   {s && s.online ? 'online' : 'offline'}
                 </td>
                 <td style={style.td}>{s && s.login_time}</td>
-                <td style={style.td}>{s && s.position ? `Q${s.position}` : <span style={style.muted}>not entered</span>}</td>
+                <td style={style.td}>{s && (s.position_str || (s.position ? `Q${s.position}` : <span style={style.muted}>not entered</span>))}</td>
                 <td style={style.td}>{s != null ? s.violations : 0}/{exam && exam.max != null ? exam.max : 3}</td>
                 <td style={{ ...style.td, ...style.muted }}>{s && s.last_reason || '-'}</td>
                 <td style={style.td}>{s && s.locked ? <span style={style.badgeEnded}>locked</span> : 'ok'}</td>

@@ -206,6 +206,11 @@ router.get('/state', verifyStudentSession, async (req, res) => {
       status = 'ended';
     }
 
+    const assignedIds = Array.isArray(s.assigned_q_ids) && s.assigned_q_ids.length > 0
+      ? s.assigned_q_ids
+      : (s.q_id ? [s.q_id] : []);
+    const hasAssigned = assignedIds.length > 0;
+
     const out = {
       status,
       title: s.title,
@@ -213,14 +218,10 @@ router.get('/state', verifyStudentSession, async (req, res) => {
       violations: parseInt(s.violations, 10),
       max: parseInt(s.max_violations, 10),
       seconds_left: status === 'live' ? Math.max(0, s.duration_min * 60 - (nowEpoch - startedEpoch)) : null,
-      entered: !!s.q_id,
+      entered: hasAssigned,
     };
 
-    const assignedIds = Array.isArray(s.assigned_q_ids) && s.assigned_q_ids.length > 0
-      ? s.assigned_q_ids
-      : (s.q_id ? [s.q_id] : []);
-
-    if (status === 'live' && !s.locked && assignedIds.length > 0) {
+    if (status === 'live' && !s.locked && hasAssigned) {
       const qRows = await query(
         'SELECT id, q_no, body FROM questions WHERE id = ANY($1) AND exam_id = $2 ORDER BY q_no ASC',
         [assignedIds, s.exam_id]
@@ -239,7 +240,7 @@ router.get('/state', verifyStudentSession, async (req, res) => {
     }
 
     // Only update last_seen when the student is actively taking the exam (in fullscreen, tab visible, not locked)
-    const isActive = req.query.active === '1' && !s.locked && !!s.q_id && status === 'live';
+    const isActive = req.query.active === '1' && !s.locked && hasAssigned && status === 'live';
     if (isActive) {
       await query('UPDATE exam_sessions SET last_seen = now() WHERE id = $1', [s.id]);
     }
@@ -276,7 +277,8 @@ router.post('/violation', verifyStudentSession, async (req, res) => {
     const nowEpoch = Math.floor(Date.now() / 1000);
     const startedEpoch = s.started_at_epoch ? parseInt(s.started_at_epoch, 10) : null;
 
-    if (s.status === 'live' && !s.locked && s.q_id && startedEpoch != null && nowEpoch - startedEpoch < s.duration_min * 60) {
+    const hasAssigned = !!s.q_id || (Array.isArray(s.assigned_q_ids) && s.assigned_q_ids.length > 0);
+    if (s.status === 'live' && !s.locked && hasAssigned && startedEpoch != null && nowEpoch - startedEpoch < s.duration_min * 60) {
       await query('BEGIN');
       try {
         const latest = await query(
