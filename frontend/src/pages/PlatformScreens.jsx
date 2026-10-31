@@ -281,7 +281,7 @@ export function StudentAuth() {
       const enterRes = await fetch(`${API_BASE}/student/enter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${json.studentJwt}` },
-        body: JSON.stringify({ exam_code: code }),
+        body: JSON.stringify({ exam_code: code, start_exam: false }),
       });
       let enterJson;
       try { enterJson = await enterRes.json(); } catch (_) { enterJson = {}; }

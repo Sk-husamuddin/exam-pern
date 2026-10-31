@@ -179,8 +179,8 @@ async function verifyStudentSession(req, res, next) {
 
     const { rows } = await query(
       `SELECT s.*, p.username, p.name, e.title, e.code, e.status, e.duration_min, e.max_violations, e.questions_per_student,
-              EXTRACT(EPOCH FROM (e.started_at AT TIME ZONE 'UTC')) as started_at_epoch,
-              EXTRACT(EPOCH FROM (s.entered_at AT TIME ZONE 'UTC')) as entered_at_epoch
+              EXTRACT(EPOCH FROM e.started_at) as started_at_epoch,
+              EXTRACT(EPOCH FROM s.entered_at) as entered_at_epoch
        FROM exam_sessions s
        JOIN profiles p ON p.id = s.user_id
        JOIN exams e ON e.id = s.exam_id
@@ -200,4 +200,60 @@ async function verifyStudentSession(req, res, next) {
   }
 }
 
-module.exports = { verifyFaculty, verifyStudentJwt, verifyStudentSession };
+// ------------------------------------------------------------------
+// Verify either student JWT or session token.
+// Allows POST /api/student/enter to be called with JWT or session token.
+// ------------------------------------------------------------------
+async function verifyStudentJwtOrSession(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : req.body.token;
+
+    if (!token) {
+      return res.status(401).json({ error: 'Missing student authentication token' });
+    }
+
+    // 1. Try JWT
+    try {
+      const decoded = jwt.verify(token, config.STUDENT_JWT_SECRET);
+      if (decoded && decoded.userId) {
+        const { rows } = await query(
+          'SELECT id, username, name, role FROM profiles WHERE id = $1 AND role = $2',
+          [decoded.userId, 'student']
+        );
+        if (rows.length > 0) {
+          req.student = { ...rows[0], userId: rows[0].id };
+          return next();
+        }
+      }
+    } catch (_) {
+      // Not a valid JWT, try session token lookup below
+    }
+
+    // 2. Try session token lookup
+    const { rows } = await query(
+      `SELECT s.*, p.username, p.name, p.id as user_id, e.title, e.code, e.status, e.duration_min, e.max_violations, e.questions_per_student,
+              EXTRACT(EPOCH FROM e.started_at) as started_at_epoch,
+              EXTRACT(EPOCH FROM s.entered_at) as entered_at_epoch
+       FROM exam_sessions s
+       JOIN profiles p ON p.id = s.user_id
+       JOIN exams e ON e.id = s.exam_id
+       WHERE s.token = $1`,
+      [token]
+    );
+
+    if (rows.length > 0) {
+      req.student = { ...rows[0], userId: rows[0].user_id };
+      return next();
+    }
+
+    return res.status(401).json({ error: 'Invalid or expired student token' });
+  } catch (err) {
+    console.error('verifyStudentJwtOrSession error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+module.exports = { verifyFaculty, verifyStudentJwt, verifyStudentSession, verifyStudentJwtOrSession };

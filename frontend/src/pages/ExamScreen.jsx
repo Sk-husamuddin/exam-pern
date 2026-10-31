@@ -183,37 +183,37 @@ export default function ExamScreen() {
     }
 
     try {
-      const d = await getJson(`${API_BASE}/student/state`, {
-        cache: 'no-store',
-        headers: await sessionAuthHeaders(),
+      const code = sessionStorage.getItem('exam_student_code') || '';
+      // Start/enter exam directly with session auth
+      const enterRes = await getJson(`${API_BASE}/student/enter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await sessionAuthHeaders()),
+        },
+        body: JSON.stringify({ exam_code: code, start_exam: true }),
       });
-
-      if (!d.entered) {
-        // Not assigned yet: call /enter using the exam code from sessionStorage with start_exam: true
-        const code = sessionStorage.getItem('exam_student_code') || '';
-        const enterRes = await getJson(`${API_BASE}/student/enter`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(await jwtAuthHeaders()),
-          },
-          body: JSON.stringify({ exam_code: code, start_exam: true }),
+      if (enterRes.session_token) {
+        sessionStorage.setItem('exam_student_token', enterRes.session_token);
+      }
+      applyData(enterRes);
+      if (!enterRes.locked && document.fullscreenElement) {
+        setArmed(true);
+      }
+    } catch (e) {
+      // Fallback: try GET /state if /enter had a transient error
+      try {
+        const d = await getJson(`${API_BASE}/student/state`, {
+          cache: 'no-store',
+          headers: await sessionAuthHeaders(),
         });
-        if (enterRes.session_token) {
-          sessionStorage.setItem('exam_student_token', enterRes.session_token);
-        }
-        applyData(enterRes);
-        if (!enterRes.locked && document.fullscreenElement) {
-          setArmed(true);
-        }
-      } else {
         applyData(d);
         if (!d.locked && document.fullscreenElement) {
           setArmed(true);
         }
+      } catch (inner) {
+        setWarning('Unable to load exam: ' + (e.message || 'Please try again.'));
       }
-    } catch (e) {
-      setWarning('Unable to load exam: ' + (e.message || 'Please try again.'));
     } finally {
       setLoading(false);
     }

@@ -77,12 +77,17 @@ export default function StudentDashboard() {
     return () => clearInterval(id);
   }, []);
 
+  const [starting, setStarting] = useState(false);
+
   useEffect(() => {
+    // Only count down if student has entered/started the exam!
+    // Until then, keep the display paused at full duration (e.g. 60:00).
     if (
       !state ||
       state.status !== 'live' ||
       state.seconds_left == null ||
-      state.seconds_left <= 0
+      state.seconds_left <= 0 ||
+      !state.entered
     )
       return;
     const tick = setInterval(() => {
@@ -92,7 +97,7 @@ export default function StudentDashboard() {
       });
     }, 1000);
     return () => clearInterval(tick);
-  }, [state?.status]);
+  }, [state?.status, state?.entered]);
 
   const fmt = (sec) => {
     if (sec == null) return '-';
@@ -104,7 +109,8 @@ export default function StudentDashboard() {
   const btnOn = state && state.status === 'live' && !state.locked;
 
   async function handleStartExam() {
-    if (!btnOn) return;
+    if (!btnOn || starting) return;
+    setStarting(true);
     try {
       if (!document.fullscreenElement) {
         await document.documentElement.requestFullscreen().catch((err) => {
@@ -112,6 +118,24 @@ export default function StudentDashboard() {
         });
       }
     } catch (_) {}
+
+    try {
+      const code = sessionStorage.getItem('exam_student_code') || examCode;
+      const res = await fetch(`${API_BASE}/student/enter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await authHeaders()),
+        },
+        body: JSON.stringify({ exam_code: code, start_exam: true }),
+      });
+      const data = await res.json();
+      if (data.session_token) {
+        sessionStorage.setItem('exam_student_token', data.session_token);
+      }
+    } catch (err) {
+      console.warn('Start exam request warning:', err);
+    }
     navigate('/student/exam');
   }
 

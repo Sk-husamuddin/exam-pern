@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { query } = require('../db');
-const { verifyStudentJwt, verifyStudentSession } = require('../middleware/auth');
+const { verifyStudentJwt, verifyStudentSession, verifyStudentJwtOrSession } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -36,6 +36,7 @@ router.get('/dashboard-state', verifyStudentSession, async (req, res) => {
       violations: parseInt(s.violations, 10),
       max: parseInt(s.max_violations, 10),
       seconds_left,
+      entered: enteredEpoch != null,
     });
   } catch (err) {
     console.error('GET /dashboard-state error:', err);
@@ -44,11 +45,11 @@ router.get('/dashboard-state', verifyStudentSession, async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// Enter exam: provide exam_code + student JWT (from /auth/student/login).
-// Assigns one question (least-used first, random tie-break).
+// Enter exam: provide exam_code + student JWT (from login) or session token.
+// Assigns questions (least-used first, random tie-break).
 // Creates the exam_sessions row and returns a session token.
 // ------------------------------------------------------------------
-router.post('/enter', verifyStudentJwt, async (req, res) => {
+router.post('/enter', verifyStudentJwtOrSession, async (req, res) => {
   try {
     const { exam_code, start_exam } = req.body;
     if (!exam_code) {
@@ -96,7 +97,7 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
 
       const curSession = (await query(
         `SELECT id, q_id, assigned_q_ids, entered_at,
-                EXTRACT(EPOCH FROM (entered_at AT TIME ZONE 'UTC')) as entered_at_epoch
+                EXTRACT(EPOCH FROM entered_at) as entered_at_epoch
          FROM exam_sessions WHERE id = $1 FOR UPDATE`,
         [sessionId]
       )).rows[0];
@@ -104,8 +105,10 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
       const nowEpoch = Math.floor(Date.now() / 1000);
       let enteredEpoch = curSession.entered_at_epoch ? parseInt(curSession.entered_at_epoch, 10) : null;
 
-      // Start exam condition: if student explicitly clicked "Start Exam" (start_exam: true) or already entered previously
-      const shouldStart = Boolean(start_exam) || enteredEpoch != null;
+      // Start exam condition:
+      // If student is logging in (start_exam === false), do not start yet.
+      // If student clicked "Start Exam" (start_exam === true) or start_exam was not passed (e.g. e2e API test), start exam.
+      const shouldStart = start_exam !== false && (start_exam === true || start_exam === undefined || enteredEpoch != null);
 
       if (shouldStart && enteredEpoch == null) {
         await query('UPDATE exam_sessions SET entered_at = now() WHERE id = $1', [sessionId]);
@@ -118,7 +121,7 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
       let assignedQuestionsList = [];
 
       const numQuestions = Math.max(1, parseInt(exam.questions_per_student, 10) || 1);
-      const hasAssigned = !!curSession.q_id || (Array.isArray(curSession.assigned_q_ids) && curSession.assigned_q_ids.length > 0);
+      let hasAssigned = !!curSession.q_id || (Array.isArray(curSession.assigned_q_ids) && curSession.assigned_q_ids.length > 0);
 
       if (exam.status === 'live' && shouldStart && elapsed < exam.duration_min * 60) {
         if (!hasAssigned) {
@@ -153,10 +156,12 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
               position: parseInt(q.q_no, 10),
               body: q.body,
             }));
+            hasAssigned = true;
           } else {
             notice = 'No questions have been set for this exam. Please inform the faculty.';
           }
         } else {
+          hasAssigned = true;
           const assignedIds = Array.isArray(curSession.assigned_q_ids) && curSession.assigned_q_ids.length > 0
             ? curSession.assigned_q_ids
             : [curSession.q_id];
@@ -200,9 +205,19 @@ router.post('/enter', verifyStudentJwt, async (req, res) => {
         violations: parseInt(sessionRow.violations, 10),
         max: parseInt(exam.max_violations, 10),
         seconds_left,
-        entered: hasAssigned && enteredEpoch != null,
+        entered: (hasAssigned || Boolean(notice)) && enteredEpoch != null,
         session_token: token,
       };
+      if (qId || assignedQuestionsList.length > 0) {
+        out.position = qNo;
+        if (assignedQuestionsList.length > 0) {
+          out.questions = assignedQuestionsList;
+          out.question = assignedQuestionsList.map((q) => `Question ${q.position}:\n${q.body}`).join('\n\n');
+        }
+      }
+      if (notice) out.notice = notice;
+
+      res.json(out);
       if (qId || assignedQuestionsList.length > 0) {
         out.position = qNo;
         if (assignedQuestionsList.length > 0) {

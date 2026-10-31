@@ -109,9 +109,16 @@ async function api(method, path, body, token) {
   await page.fill('input[id="exam-code"]', examCode);
   await page.click('form button[type="submit"]');
 
-  // Should land on /student/exam
+  // Should land on /student/dashboard first
+  await page.waitForURL(`${BASE}/student/dashboard`, { timeout: 15000 });
+  assert(page.url() === `${BASE}/student/dashboard`, 'Student lands on /student/dashboard after login');
+
+  // Click the red "Start Exam" button to begin exam & enter fullscreen
+  await page.click('button:has-text("Start Exam")');
+
+  // Should navigate into /student/exam
   await page.waitForURL(`${BASE}/student/exam`, { timeout: 15000 });
-  assert(page.url() === `${BASE}/student/exam`, 'Student lands on /student/exam after login');
+  assert(page.url() === `${BASE}/student/exam`, 'Student lands on /student/exam after clicking Start Exam');
 
   // Debug: print page content
   const pageContent = await page.locator('body').innerText();
