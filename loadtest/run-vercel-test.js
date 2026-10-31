@@ -72,3 +72,4 @@ if (require.main === module) {
   const vus = parseInt(process.argv[2], 10) || 71;
   runVercelLoad(vus);
 }
+
