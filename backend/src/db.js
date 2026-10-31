@@ -11,7 +11,7 @@ const pool = new Pool({
   connectionString: config.DATABASE_URL,
   max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  connectionTimeoutMillis: 30000,
   ssl: isSupabase ? { rejectUnauthorized: false } : false,
 });
 

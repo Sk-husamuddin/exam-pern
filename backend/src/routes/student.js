@@ -63,91 +63,68 @@ router.post('/enter', verifyStudentJwtOrSession, async (req, res) => {
   const s = req.student;
   const code = String(exam_code).toUpperCase().trim();
 
+  // 1. Fast preliminary check: verify exam exists and is not ended
+  const examCheck = await query(
+    'SELECT id, title, code, status, duration_min, max_violations, questions_per_student FROM exams WHERE code = $1 AND status <> $2',
+    [code, 'ended']
+  );
+  if (examCheck.rows.length === 0) {
+    return res.status(400).json({ error: 'Invalid exam code, or the exam has ended' });
+  }
+  const exam = examCheck.rows[0];
+
   let attempt = 0;
   while (attempt < MAX_ENTER_RETRIES) {
     attempt++;
-    const client = await pool.connect();
+    let client;
     try {
+      client = await pool.connect();
       await client.query('BEGIN');
-
-      // 1. Verify exam existence and active state without taking an exclusive row lock
-      const examRes = await client.query(
-        'SELECT id, title, code, status, duration_min, max_violations, questions_per_student FROM exams WHERE code = $1 AND status <> $2',
-        [code, 'ended']
-      );
-      if (examRes.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Invalid exam code, or the exam has ended' });
-      }
-      const exam = examRes.rows[0];
 
       // 2. Transaction-scoped advisory lock on exam.id
       // Serializes concurrent entries for the SAME exam (prevents login_order race & FK deadlock)
       // Released automatically on COMMIT or ROLLBACK; different exams stay 100% parallel.
       await client.query('SELECT pg_advisory_xact_lock($1)', [exam.id]);
 
-      // 3. Idempotently look up existing session for (exam_id, user_id)
-      const existingRes = await client.query(
-        `SELECT id, token, login_order, q_id, assigned_q_ids, locked, violations, entered_at,
-                EXTRACT(EPOCH FROM entered_at) as entered_at_epoch
-         FROM exam_sessions WHERE exam_id = $1 AND user_id = $2`,
-        [exam.id, s.userId]
+      // 3. Atomically insert or retrieve exam session, compute login_order, and set entered_at
+      const generatedToken = crypto.randomBytes(16).toString('hex');
+      const wantsStart = start_exam !== false;
+
+      const sessionRes = await client.query(
+        `INSERT INTO exam_sessions (exam_id, user_id, login_order, login_time, token, last_seen, entered_at)
+         VALUES (
+           $1,
+           $2,
+           (SELECT COALESCE(MAX(login_order), 0) + 1 FROM exam_sessions WHERE exam_id = $1),
+           now(),
+           $3,
+           now(),
+           CASE WHEN $4 = true THEN now() ELSE NULL END
+         )
+         ON CONFLICT (exam_id, user_id) DO UPDATE
+         SET token = COALESCE(exam_sessions.token, EXCLUDED.token),
+             last_seen = now(),
+             entered_at = CASE
+               WHEN exam_sessions.entered_at IS NOT NULL THEN exam_sessions.entered_at
+               WHEN $4 = true THEN now()
+               ELSE NULL
+             END
+         RETURNING id, token, login_order, q_id, assigned_q_ids, locked, violations, entered_at,
+                   EXTRACT(EPOCH FROM entered_at) as entered_at_epoch`,
+        [exam.id, s.userId, generatedToken, wantsStart]
       );
 
-      let sessionRow;
-      let token;
-      if (existingRes.rows.length > 0) {
-        sessionRow = existingRes.rows[0];
-        token = sessionRow.token || crypto.randomBytes(16).toString('hex');
-        await client.query('UPDATE exam_sessions SET token = $1, last_seen = now() WHERE id = $2', [token, sessionRow.id]);
-      } else {
-        token = crypto.randomBytes(16).toString('hex');
-        // Compute login_order atomically inside the serialized advisory lock
-        const insRes = await client.query(
-          `INSERT INTO exam_sessions (exam_id, user_id, login_order, login_time, token, last_seen)
-           VALUES (
-             $1,
-             $2,
-             (SELECT COALESCE(MAX(login_order), 0) + 1 FROM exam_sessions WHERE exam_id = $1),
-             now(),
-             $3,
-             now()
-           )
-           RETURNING id, token, login_order, q_id, assigned_q_ids, locked, violations, entered_at,
-                     EXTRACT(EPOCH FROM entered_at) as entered_at_epoch`,
-          [exam.id, s.userId, token]
-        );
-        if (!insRes.rows || insRes.rows.length === 0) {
-          throw new Error('Failed to create exam session row');
-        }
-        sessionRow = insRes.rows[0];
-      }
-
-      // Safe guard: verify sessionRow is populated
+      const sessionRow = sessionRes.rows[0];
       if (!sessionRow) {
-        await client.query('ROLLBACK');
-        return res.status(500).json({ error: 'Failed to retrieve exam session' });
+        throw new Error('Failed to retrieve or create exam session');
       }
 
+      const token = sessionRow.token || generatedToken;
       const nowEpoch = Math.floor(Date.now() / 1000);
-      let enteredEpoch = sessionRow.entered_at_epoch ? parseInt(sessionRow.entered_at_epoch, 10) : null;
-
-      // Start exam condition:
-      // If student is logging in (start_exam === false), do not start timer yet.
-      // If student clicked "Start Exam" (start_exam === true) or start_exam was omitted (e.g. tests), start exam.
-      const shouldStart = start_exam !== false && (start_exam === true || start_exam === undefined || enteredEpoch != null);
-
-      if (shouldStart && enteredEpoch == null) {
-        const stampRes = await client.query(
-          `UPDATE exam_sessions SET entered_at = now() WHERE id = $1
-           RETURNING EXTRACT(EPOCH FROM entered_at) as entered_at_epoch`,
-          [sessionRow.id]
-        );
-        enteredEpoch = stampRes.rows[0]?.entered_at_epoch ? parseInt(stampRes.rows[0].entered_at_epoch, 10) : nowEpoch;
-        sessionRow.entered_at_epoch = enteredEpoch;
-      }
-
+      const enteredEpoch = sessionRow.entered_at_epoch ? parseInt(sessionRow.entered_at_epoch, 10) : null;
       const elapsed = enteredEpoch != null ? nowEpoch - enteredEpoch : 0;
+      const shouldStart = wantsStart && enteredEpoch != null;
+
       let qId = sessionRow.q_id ? parseInt(sessionRow.q_id, 10) : null;
       let qNo = 0;
       let assignedQuestionsList = [];
@@ -253,7 +230,9 @@ router.post('/enter', verifyStudentJwtOrSession, async (req, res) => {
 
       return res.json(out);
     } catch (err) {
-      try { await client.query('ROLLBACK'); } catch (_) {}
+      if (client) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+      }
       const pgCode = err.code;
       if (RETRY_CODES.has(pgCode) && attempt < MAX_ENTER_RETRIES) {
         const backoffMs = 50 + Math.floor(Math.random() * 100);
@@ -264,7 +243,7 @@ router.post('/enter', verifyStudentJwtOrSession, async (req, res) => {
       console.error('POST /enter fatal error:', err);
       return res.status(500).json({ error: 'Could not assign a question, please click again.' });
     } finally {
-      client.release();
+      if (client) client.release();
     }
   }
 });
