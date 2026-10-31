@@ -364,7 +364,7 @@ export function UnifiedLogin() {
                 <input
                   id="unified-exam-code"
                   className="exam-code"
-                  placeholder="A1B2C3 (Students only)"
+                  placeholder="(Students only)"
                   maxLength={6}
                   value={code}
                   onChange={(e) => {
@@ -379,8 +379,8 @@ export function UnifiedLogin() {
               {signup
                 ? 'Create faculty account'
                 : isStudent
-                ? 'Enter Exam as Student'
-                : 'Sign in as Faculty'}
+                  ? 'Enter Exam as Student'
+                  : 'Sign in as Faculty'}
             </Button>
           </form>
 
