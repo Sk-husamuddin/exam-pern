@@ -1,84 +1,109 @@
 # Deployment — Smart Exam Platform (PERN)
 
-## Recommended: Render.com
+## Architecture Overview
 
-Render is ideal for this stack because it supports:
-- **Web Service** (Node.js backend) with auto-deploy from Git
-- **Static Site** (React frontend) or serve frontend from the same backend
-- **External Database**: Supabase (managed PostgreSQL) — Render does not host the DB; Supabase does
-
-### Option A: Backend on Render + Frontend on Vercel/Netlify (Recommended)
-
-1. **Backend** (`exam-pern/backend`)
-   - Create a Render Web Service, connect your Git repo, set root directory to `exam-pern/backend`
-   - Build command: `npm install`
-   - Start command: `npm start`
-   - Add environment variables (from `.env.example`):
-     - `PORT=10000` (Render assigns port; use `process.env.PORT || 5000`)
-     - `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`
-     - `DATABASE_URL` (Supabase pooled connection string)
-     - `STUDENT_JWT_SECRET` (random string)
-     - `BASE_URL=https://your-backend.onrender.com`
-
-2. **Frontend** (`exam-pern/frontend`)
-   - Create a Vercel/Netlify project, connect your Git repo, root directory `exam-pern/frontend`
-   - Build command: `npm run build`
-   - Add environment variables:
-     - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-     - `VITE_API_BASE=https://your-backend.onrender.com/api`
-     - `VITE_AUTH_BASE=https://your-backend.onrender.com/auth`
-
-3. **Keep-alive**: Render free tier web services spin down after inactivity. To prevent this:
-   - Use Render's **paid plan** (recommended for exams), or
-   - Add a cron job (e.g., Cron-job.org, GitHub Actions, or UptimeRobot) that hits `GET https://your-backend.onrender.com/health` every 5–10 minutes.
-
-### Option B: Single Render Web Service (Backend serves frontend)
-
-1. Build the frontend: `cd exam-pern/frontend && npm run build`
-2. Copy `dist/` contents into `exam-pern/backend/public/`
-3. Add to `backend/src/app.js`:
-   ```js
-   app.use(express.static('public'));
-   app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-   ```
-4. Deploy backend on Render with root directory `exam-pern/backend`
+- **Frontend**: React (Vite SPA) deployed on **Vercel** (`https://exam-pern.vercel.app`)
+- **Backend**: Node.js / Express Web Service deployed on **Render** (`https://exam-pern.onrender.com`)
+- **Database & Auth**: Managed PostgreSQL and Authentication on **Supabase**
 
 ---
 
-## Environment Variables Checklist (Production)
+## 1. Frontend Deployment (Vercel)
+
+### Project Configuration
+- **Root Directory**: `frontend` (in Vercel Project Settings > General > Root Directory)
+- **Framework Preset**: `Vite`
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- **Install Command**: `npm install`
+
+### SPA Routing & Redirects
+To prevent 404 errors on direct navigation or page refresh for client-side routes (e.g. `/faculty/login`, `/student/login`, `/faculty/dashboard`), the repository includes:
+- `frontend/vercel.json`:
+  ```json
+  {
+    "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  }
+  ```
+- `frontend/public/_redirects`:
+  ```
+  /* /index.html 200
+  ```
+
+### Environment Variables (Vercel)
+Set the following four environment variables in **Vercel Project Settings > Environment Variables**:
+
+| Variable | Value / Format | Description |
+|---|---|---|
+| `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` | Supabase Project URL |
+| `VITE_SUPABASE_ANON_KEY` | `ey...` | Supabase Anon Public Key |
+| `VITE_API_BASE` | `https://exam-pern.onrender.com/api` | Backend API base URL |
+| `VITE_AUTH_BASE` | `https://exam-pern.onrender.com/auth` | Backend Auth base URL |
+
+*Note: If `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing at build time, the frontend displays a visible "Configuration missing" screen rather than crashing with a blank page.*
+
+---
+
+## 2. Backend Deployment (Render)
+
+### Render Web Service Settings
+- **Root Directory**: `backend`
+- **Environment**: `Node`
+- **Build Command**: `npm install`
+- **Start Command**: `npm start`
+- **Health Check Path**: `/health`
+
+### Environment Variables (Render)
+Configure in **Render Dashboard > Environment**:
 
 | Variable | Required | Notes |
-|----------|----------|-------|
-| `PORT` | Yes | Render sets this automatically |
-| `SUPABASE_URL` | Yes | From Supabase dashboard |
+|---|---|---|
+| `PORT` | Yes | Assigned automatically by Render (defaults to 5000 locally) |
+| `BASE_URL` | Yes | `https://exam-pern.onrender.com` |
+| `CORS_ORIGINS` | Yes | `http://localhost:3000,https://exam-pern.vercel.app` (comma-separated allowed origins) |
+| `SUPABASE_URL` | Yes | From Supabase Settings > API |
 | `SUPABASE_JWT_SECRET` | Yes | From Supabase Settings > API |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | From Supabase Settings > API (keep secret!) |
-| `DATABASE_URL` | Yes | Supabase connection string (use pooled `:6543` for serverless/Edge) |
-| `STUDENT_JWT_SECRET` | Yes | Any random 32+ char string |
-| `BASE_URL` | Yes | Public backend URL |
-| `VITE_SUPABASE_URL` | Yes | Frontend |
-| `VITE_SUPABASE_ANON_KEY` | Yes | Frontend |
-| `VITE_API_BASE` | Yes | Backend public URL + `/api` |
+| `DATABASE_URL` | Yes | Supabase connection string (use pooled `:6543` for connection pooling) |
+| `STUDENT_JWT_SECRET` | Yes | Random secure 32+ character string |
+
+### Keep-alive / Spin-down Prevention
+Render free tier instances sleep after 15 minutes of inactivity. To prevent delays during exams:
+- Use Render's paid plan, or
+- Configure a monitor (e.g. UptimeRobot, cron-job.org) hitting `GET https://exam-pern.onrender.com/health` every 5–10 minutes.
 
 ---
 
-## Security Notes for Production
+## 3. Supabase Configuration (Authentication & URLs)
 
-1. **Never commit `.env`** — add it to `.gitignore`
-2. **`SUPABASE_SERVICE_ROLE_KEY`** bypasses RLS — keep it backend-only
-3. **Use HTTPS** in production (Render provides automatic TLS)
-4. **Set `DEBUG=false`** in production to avoid stack traces
-5. **Consider rate limiting** on `/auth/student/login` (brute-force protection) — add `express-rate-limit` if needed
-6. **Student password == username** is by design but weak; enforce strong passwords if your use-case requires it
+Go to your **Supabase Dashboard > Authentication > URL Configuration**:
+
+### 1. Site URL
+Set the primary Site URL to your production Vercel frontend:
+```
+https://exam-pern.vercel.app
+```
+
+### 2. Redirect URLs (Allowlist)
+Add the following URL patterns to **Redirect URLs**:
+```
+https://exam-pern.vercel.app/**
+https://exam-pern.vercel.app/faculty/login
+http://localhost:3000/**
+http://localhost:3000/faculty/login
+```
+
+This ensures magic links, email verification redirects, and password resets redirect faculty users back to the correct login page without open redirect vulnerabilities.
 
 ---
 
-## Troubleshooting
+## 4. Troubleshooting Checklist
 
-| Issue | Fix |
-|-------|-----|
-| `connect ECONNREFUSED` to database | Check `DATABASE_URL`, ensure Supabase project is active, add Render's outbound IPs to Supabase firewall if needed |
-| Faculty JWT invalid | Verify `SUPABASE_JWT_SECRET` matches Supabase Settings > API |
-| Student login returns 401 | Check bcrypt hash in `profiles.password_hash` matches the username |
-| `.docx` import returns empty | Ensure file is a valid `.docx` (not `.doc`) and under 5 MB |
-| Polling stops working | Check browser console, verify backend `/health` is reachable |
+| Issue | Likely Cause | Solution |
+|---|---|---|
+| Vercel returns `404 NOT_FOUND` on direct visit | Missing SPA rewrite | Confirm `frontend/vercel.json` exists with rewrites to `/index.html` and Vercel Root Directory is set to `frontend`. |
+| "Configuration missing" screen on frontend | Missing env vars at build time | Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Vercel and trigger a redeploy. |
+| CORS error on student enter or faculty actions | Origin not allowed | Set `CORS_ORIGINS=http://localhost:3000,https://exam-pern.vercel.app` in Render environment. |
+| Student login loops back to login | Session storage mismatch | The application uses `sessionStorage` for student tokens (`exam_student_*`). Ensure browser allows session storage. |
+| Polling stops in ExamScreen | Health check failed | Polling queries `/student/state`; remove any health check targeting `${API_BASE}/health`. |
+| Database connection refused (`ECONNREFUSED`) | IP restriction or invalid string | Verify `DATABASE_URL` uses the pooled host and port 6543. |
