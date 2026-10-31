@@ -27,3 +27,4 @@ END $$;
 -- 3. Composite indexes for fast live monitoring and polling
 CREATE INDEX IF NOT EXISTS idx_sessions_exam_lastseen ON exam_sessions(exam_id, last_seen);
 CREATE INDEX IF NOT EXISTS idx_violation_log_session_id ON violation_log(session_id);
+

@@ -8,7 +8,12 @@
     "dev": "node src/server.js",
     "check-db": "node scripts/check-db.js",
     "e2e": "node scripts/e2e.js",
-    "purge-e2e": "node scripts/purge-e2e-users.js"
+    "purge-e2e": "node scripts/purge-e2e-users.js",
+    "loadtest": "node ../loadtest/run-all-tests.js",
+    "loadtest:burst": "node ../loadtest/run-burst-enter.js",
+    "loadtest:full": "node ../loadtest/run-full-exam.js",
+    "loadtest:vercel": "node ../loadtest/run-vercel-test.js",
+    "loadtest:clean": "node ../loadtest/cleanup-test-exam.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
