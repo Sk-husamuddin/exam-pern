@@ -44,11 +44,8 @@ export default function StudentLogin() {
       // Store the session token returned by /enter (stored in exam_sessions.token)
       sessionStorage.setItem('exam_student_code', examCode.trim().toUpperCase());
       sessionStorage.setItem('exam_student_token', joinJson.session_token);
-      if (joinJson.status === 'live') {
-        navigate('/student/exam');
-      } else {
-        navigate('/student/dashboard');
-      }
+      sessionStorage.setItem('exam_student_title', joinJson.title || '');
+      navigate('/student/dashboard');
     } catch (err) {
       setError(err.message || 'Login failed');
     } finally {

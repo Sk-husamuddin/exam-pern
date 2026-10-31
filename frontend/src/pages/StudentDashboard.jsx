@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Play, Clock, LogOut, AlertCircle, ShieldAlert, Maximize2, CheckCircle2 } from 'lucide-react';
 import { API_BASE } from '../lib/supabase.js';
 import Loading from '../components/Loading.jsx';
 
@@ -7,8 +8,19 @@ export default function StudentDashboard() {
   const [state, setState] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const POLL_MS = 3000;
+
+  const studentUser = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('exam_student_user') || '{}');
+    } catch (_) {
+      return {};
+    }
+  })();
+  const studentName = studentUser.name || studentUser.username || 'Student';
+  const examCode = sessionStorage.getItem('exam_student_code') || '';
 
   async function authHeaders() {
     const token = sessionStorage.getItem('exam_student_token');
@@ -89,130 +101,220 @@ export default function StudentDashboard() {
     return `${m}:${s}`;
   };
 
-  const btnText = () => {
-    if (!state) return 'Loading…';
-    if (state.locked) return 'Locked - contact faculty';
-    if (state.status === 'live') return 'Enter exam';
-    if (state.status === 'ended') return 'Exam ended';
-    return 'Waiting for faculty to start the exam…';
-  };
-
   const btnOn = state && state.status === 'live' && !state.locked;
+
+  async function handleStartExam() {
+    if (!btnOn) return;
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen().catch((err) => {
+          console.warn('Fullscreen request failed:', err);
+        });
+      }
+    } catch (_) {}
+    navigate('/student/exam');
+  }
 
   return (
     <div style={style.page}>
       {loading && <Loading />}
       {!loading && (
         <>
-        {error && (
-          <div
-            role="alert"
-            aria-live="polite"
-            style={{
-              ...style.alert,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <span>{error}</span>
-            <button
-              onClick={retry}
+          {error && (
+            <div
+              role="alert"
+              aria-live="polite"
               style={{
-                background: 'transparent',
-                border: '1px solid currentColor',
-                color: 'currentColor',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 600,
-                padding: '2px 8px',
+                ...style.alert,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
               }}
             >
-              Retry
-            </button>
-          </div>
-        )}
-        <nav style={style.nav}>
-          <b>Exam Portal</b>
-          <span style={style.spacer}></span>
-          <span>Student Dashboard</span>
-          <button
-            onClick={() => {
-              sendLeaveSignal();
-              localStorage.removeItem('exam_student_token');
-              localStorage.removeItem('exam_student_jwt');
-              localStorage.removeItem('exam_student_user');
-              localStorage.removeItem('exam_student_code');
-              sessionStorage.removeItem('exam_student_token');
-              sessionStorage.removeItem('exam_student_jwt');
-              sessionStorage.removeItem('exam_student_user');
-              sessionStorage.removeItem('exam_student_code');
-              sessionStorage.removeItem('exam_student_title');
-              window.location.href = '/student/login';
-            }}
-            style={style.btnDanger}
-          >
-            Logout
-          </button>
-        </nav>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertCircle size={18} />
+                <span>{error}</span>
+              </div>
+              <button
+                onClick={retry}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid currentColor',
+                  color: 'currentColor',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
-        <div style={style.card}>
-          <h2 style={{ marginTop: 0 }}>Welcome, Student</h2>
-          {state && (
-            <>
-              <p style={style.muted}>
-                One question from this exam&rsquo;s faculty-created question list is assigned when you enter.
-              </p>
-              <div style={style.stats}>
-                <div style={style.stat}>
-                  <small>Status</small>
-                  <b style={style.badge(state.status)}>{state.status || '-'}</b>
-                </div>
-                <div style={style.stat}>
-                  <small>Time left</small>
-                  <b id="timeLeft">{fmt(state.seconds_left)}</b>
-                </div>
-                <div style={style.stat}>
-                  <small>Violations</small>
-                  <b>{state.violations != null ? state.violations : 0}/{state.max != null ? state.max : '-'}</b>
+          {/* Navigation Bar */}
+          <nav style={style.nav}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <b>Exam Portal</b>
+              <span style={style.navDivider}>|</span>
+              <span style={{ fontSize: 13, color: '#94a3b8' }}>Student Dashboard</span>
+            </div>
+            <span style={style.spacer}></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={style.userPill}>{studentName}</span>
+              <button
+                onClick={() => {
+                  sendLeaveSignal();
+                  localStorage.removeItem('exam_student_token');
+                  localStorage.removeItem('exam_student_jwt');
+                  localStorage.removeItem('exam_student_user');
+                  localStorage.removeItem('exam_student_code');
+                  sessionStorage.removeItem('exam_student_token');
+                  sessionStorage.removeItem('exam_student_jwt');
+                  sessionStorage.removeItem('exam_student_user');
+                  sessionStorage.removeItem('exam_student_code');
+                  sessionStorage.removeItem('exam_student_title');
+                  window.location.href = '/student/login';
+                }}
+                style={style.btnDanger}
+                title="Log out from student session"
+              >
+                <LogOut size={14} />
+                <span>Logout</span>
+              </button>
+            </div>
+          </nav>
+
+          {/* Main Assessment Card */}
+          <div style={style.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+              <div>
+                <span style={style.eyebrow}>ASSESSMENT PORTAL</span>
+                <h2 style={{ margin: '4px 0 6px', fontSize: 24, color: '#0f172a' }}>
+                  {state?.title || sessionStorage.getItem('exam_student_title') || 'Assigned Exam'}
+                </h2>
+                <div style={{ fontSize: 13, color: '#64748b' }}>
+                  Student: <b>{studentName}</b>
+                  {studentUser.username && studentUser.username !== studentName && (
+                    <span> ({studentUser.username})</span>
+                  )}
                 </div>
               </div>
-              <p id="note" className="muted" style={style.muted}>
-                {btnOn
-                  ? 'The exam is live. Click "Enter exam" to open your question.'
-                  : state.status === 'ended'
-                  ? 'This exam has ended.'
-                  : state.locked
-                  ? 'Your exam is locked.'
-                  : 'One question from this exam&rsquo;s faculty-created question list is assigned when you enter.'}
-              </p>
-              {btnOn ? (
-                <Link to="/student/exam" style={style.btnLink(true)}>
-                  {btnText()}
-                </Link>
-              ) : (
-                <span style={style.btnLink(false)}>{btnText()}</span>
+              {examCode && (
+                <div style={style.codeBox}>
+                  <small style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.05em' }}>Exam Code</small>
+                  <span style={style.codeText}>{examCode}</span>
+                </div>
               )}
-            </>
-          )}
-          {!state && <p>Loading…</p>}
-        </div>
+            </div>
 
-        <div style={style.card}>
-          <h3 style={{ marginTop: 0 }}>Instructions</h3>
-          <ul style={style.rules}>
-            <li>Stay on this page until the faculty starts the exam. The button turns active when it starts.</li>
-            <li>When you enter fullscreen, one question from this exam&rsquo;s faculty-created question list is assigned to you. If you re-enter, you keep the same question.</li>
-            <li>The exam opens in <b>fullscreen</b>. Your question is shown only while you are in fullscreen.</li>
-            <li>Do <b>not</b> switch tabs, open other windows, or leave fullscreen. Each time is recorded as a violation.</li>
-            <li>After <b>{state && state.max != null ? state.max : '?'}</b> violations your exam is locked and you must contact the faculty.</li>
-            <li>Copy, paste, right-click and developer shortcuts are disabled.</li>
-            <li>Logging in from another browser logs you out of the first one.</li>
-          </ul>
-        </div>
+            {state && (
+              <>
+                <div style={style.stats}>
+                  <div style={style.stat}>
+                    <small style={style.statLabel}>Exam Status</small>
+                    <b style={style.badge(state.status)}>
+                      {state.status === 'live' ? 'Live Now' : state.status === 'draft' ? 'Waiting to Start' : (state.status || '-')}
+                    </b>
+                  </div>
+                  <div style={style.stat}>
+                    <small style={style.statLabel}>Time Remaining</small>
+                    <b id="timeLeft" style={{ fontSize: 18, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Clock size={16} color="#6366f1" />
+                      {fmt(state.seconds_left)}
+                    </b>
+                  </div>
+                  <div style={style.stat}>
+                    <small style={style.statLabel}>Recorded Violations</small>
+                    <b style={{ fontSize: 18, color: state.violations > 0 ? '#dc2626' : '#16a34a' }}>
+                      {state.violations != null ? state.violations : 0} / {state.max != null ? state.max : 3}
+                    </b>
+                  </div>
+                </div>
 
-        {error && <div style={style.alert}>{error}</div>}
+                {/* State Guidance Message */}
+                <div style={style.statusNoticeBox(btnOn, state.status, state.locked)}>
+                  {btnOn ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CheckCircle2 size={18} color="#15803d" />
+                      <span style={{ fontWeight: 600, color: '#15803d' }}>
+                        The exam is live! Click the red &quot;Start Exam&quot; button below to enter fullscreen and begin answering.
+                      </span>
+                    </div>
+                  ) : state.status === 'ended' ? (
+                    <span style={{ color: '#475569' }}>This exam has officially ended. Thank you for your submission.</span>
+                  ) : state.locked ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <ShieldAlert size={18} color="#b91c1c" />
+                      <span style={{ color: '#b91c1c', fontWeight: 600 }}>
+                        Your exam session is locked due to violations ({state.violations}/{state.max || 3}). Please contact your faculty invigilator to unlock it.
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Clock size={18} color="#d97706" />
+                      <span style={{ color: '#b45309' }}>
+                        Waiting for faculty to start the exam. Please remain on this screen; the red <b>Start Exam</b> button will activate automatically.
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* The Red Start Exam Button */}
+                <div style={{ marginTop: 24, marginBottom: 8 }}>
+                  {btnOn ? (
+                    <button
+                      onClick={handleStartExam}
+                      style={style.btnStartExamRed}
+                      title="Enter fullscreen and begin exam"
+                    >
+                      <Play size={20} fill="#ffffff" color="#ffffff" />
+                      <span>Start Exam</span>
+                      <Maximize2 size={16} style={{ marginLeft: 6, opacity: 0.8 }} />
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      style={style.btnDisabled}
+                    >
+                      {state.locked
+                        ? 'Locked — Contact Faculty'
+                        : state.status === 'ended'
+                        ? 'Exam Ended'
+                        : 'Waiting for faculty to start the exam…'}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+            {!state && <p style={{ color: '#64748b' }}>Loading exam details…</p>}
+          </div>
+
+          {/* Exam Security Instructions Card */}
+          <div style={style.card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <ShieldAlert size={18} color="#4f46e5" />
+              <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>Exam Rules & Security Guidelines</h3>
+            </div>
+            <ul style={style.rules}>
+              <li>
+                Clicking <b>&quot;Start Exam&quot;</b> will immediately switch your screen into <b>fullscreen mode</b> and load your assigned questions.
+              </li>
+              <li>
+                <b>Do not leave fullscreen or switch tabs:</b> Exiting fullscreen, minimizing the window, or switching browser tabs is recorded as a security violation.
+              </li>
+              <li>
+                <b>Automatic Lockout:</b> Reaching <b>{state && state.max != null ? state.max : 3}</b> violations will lock your test and require faculty intervention.
+              </li>
+              <li>
+                Keyboard shortcuts (copy, cut, paste, devtools, print screen) and right-click context menus are strictly disabled during the exam.
+              </li>
+              <li>
+                If you accidentally lose internet connection, do not close your browser. It will reconnect and preserve your timer automatically.
+              </li>
+            </ul>
+          </div>
         </>
       )}
     </div>
@@ -220,43 +322,151 @@ export default function StudentDashboard() {
 }
 
 const style = {
-  page: { fontFamily: 'system-ui, sans-serif', maxWidth: 1100, margin: '0 auto', padding: 16 },
+  page: {
+    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+    maxWidth: 960,
+    margin: '0 auto',
+    padding: '24px 16px',
+    color: '#1e293b',
+  },
   nav: {
-    background: '#1d2433', color: '#fff', padding: '12px 24px', display: 'flex',
-    gap: 18, alignItems: 'center', marginBottom: 24,
+    background: '#1e293b',
+    color: '#fff',
+    padding: '12px 20px',
+    borderRadius: 12,
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: 24,
+    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)',
   },
-  btnDanger: { background: '#d33', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer' },
-  spacer: { flex: 1 },
-  card: {
-    background: '#fff', borderRadius: 10, padding: 22, boxShadow: '0 2px 10px rgba(0,0,0,.08)', marginBottom: 18,
+  navDivider: { color: '#475569', fontSize: 14 },
+  userPill: {
+    background: 'rgba(255, 255, 255, 0.12)',
+    color: '#f1f5f9',
+    padding: '4px 10px',
+    borderRadius: 6,
+    fontSize: 12,
+    fontWeight: 600,
   },
-  muted: { color: '#6b7280', fontSize: 14 },
-  stats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, margin: '14px 0' },
-  stat: { background: '#eef1f7', borderRadius: 8, padding: 12 },
-  statSmall: { display: 'block', color: '#6b7280', marginBottom: 4, fontSize: 12 },
-  badge: (s) => ({
-    padding: '2px 8px', borderRadius: 10, fontSize: 12, color: '#fff',
-    background: s === 'live' ? '#1a8f4a' : s === 'ended' ? '#d33' : '#b7791f',
-  }),
-  btnLink: (on) => ({
-    display: 'inline-block',
-    background: on ? '#2b5cff' : '#cbd5e1',
+  btnDanger: {
+    background: '#ef4444',
     color: '#fff',
     border: 'none',
-    padding: '9px 16px',
+    padding: '6px 12px',
     borderRadius: 6,
-    cursor: on ? 'pointer' : 'not-allowed',
-    textDecoration: 'none',
-    fontSize: 14,
-    opacity: on ? 1 : 0.5,
+    cursor: 'pointer',
+    fontSize: 12,
+    fontWeight: 600,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+  },
+  spacer: { flex: 1 },
+  card: {
+    background: '#ffffff',
+    borderRadius: 12,
+    padding: 24,
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    marginBottom: 20,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: '0.08em',
+    color: '#6366f1',
+    textTransform: 'uppercase',
+  },
+  codeBox: {
+    background: '#f8fafc',
+    border: '1px solid #cbd5e1',
+    borderRadius: 8,
+    padding: '8px 14px',
+    textAlign: 'center',
+  },
+  codeText: {
+    fontFamily: 'ui-monospace, monospace',
+    fontSize: 18,
+    fontWeight: 800,
+    letterSpacing: '0.15em',
+    color: '#0f172a',
+  },
+  stats: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 14,
+    margin: '18px 0',
+  },
+  stat: {
+    background: '#f8fafc',
+    borderRadius: 8,
+    padding: 14,
+    border: '1px solid #e2e8f0',
+  },
+  statLabel: {
+    display: 'block',
+    color: '#64748b',
+    marginBottom: 6,
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  badge: (s) => ({
+    display: 'inline-block',
+    padding: '3px 10px',
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#fff',
+    background: s === 'live' ? '#16a34a' : s === 'ended' ? '#64748b' : '#d97706',
   }),
-  rules: { margin: 0, paddingLeft: 20, lineHeight: 1.8 },
+  statusNoticeBox: (btnOn, status, locked) => ({
+    padding: 14,
+    borderRadius: 8,
+    fontSize: 13,
+    lineHeight: 1.5,
+    background: btnOn ? '#f0fdf4' : locked ? '#fef2f2' : status === 'draft' ? '#fffbeb' : '#f8fafc',
+    border: `1px solid ${btnOn ? '#bbf7d0' : locked ? '#fecaca' : status === 'draft' ? '#fde68a' : '#e2e8f0'}`,
+    marginTop: 10,
+  }),
+  btnStartExamRed: {
+    background: '#dc2626',
+    color: '#ffffff',
+    border: 'none',
+    padding: '14px 34px',
+    borderRadius: 8,
+    cursor: 'pointer',
+    fontSize: 16,
+    fontWeight: 700,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 10,
+    boxShadow: '0 4px 14px rgba(220, 38, 38, 0.4)',
+    transition: 'transform 0.15s ease, background-color 0.15s ease',
+  },
+  btnDisabled: {
+    background: '#e2e8f0',
+    color: '#64748b',
+    border: 'none',
+    padding: '12px 24px',
+    borderRadius: 8,
+    cursor: 'not-allowed',
+    fontSize: 14,
+    fontWeight: 600,
+  },
+  rules: {
+    margin: 0,
+    paddingLeft: 20,
+    lineHeight: 1.8,
+    fontSize: 13,
+    color: '#475569',
+  },
   alert: {
     color: '#b91c1c',
     background: '#fef2f2',
-    padding: 10,
-    borderRadius: 6,
-    marginBottom: 12,
+    border: '1px solid #fecaca',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
     fontSize: 14,
   },
 };

@@ -267,13 +267,6 @@ export function StudentAuth() {
     setError('');
     setLoading(true);
 
-    // Step 1: request fullscreen synchronously as a user gesture
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen().catch(() => {});
-      }
-    } catch (_) {}
-
     try {
       const res = await fetch(`${AUTH_BASE}/student/login`, {
         method: 'POST',
@@ -295,18 +288,15 @@ export function StudentAuth() {
       if (!enterRes.ok) throw new Error(enterJson.error || 'Invalid exam code, or the exam has ended');
       if (enterJson.error) throw new Error(enterJson.error);
 
-      // Store for ExamScreen; cleared on logout/exam end
+      // Store for StudentDashboard & ExamScreen; cleared on logout/exam end
       sessionStorage.setItem('exam_student_jwt', json.studentJwt);
       sessionStorage.setItem('exam_student_user', JSON.stringify(json.user));
       sessionStorage.setItem('exam_student_token', enterJson.session_token);
       sessionStorage.setItem('exam_student_code', code.trim().toUpperCase());
       sessionStorage.setItem('exam_student_title', enterJson.title || '');
 
-      navigate('/student/exam');
+      navigate('/student/dashboard');
     } catch (err) {
-      if (document.fullscreenElement) {
-        try { document.exitFullscreen(); } catch (_) {}
-      }
       setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
