@@ -56,11 +56,11 @@ async function runFullExamScenario(vuCount = 71) {
           body: JSON.stringify({ exam_code: EXAM_CODE, start_exam: true }),
         });
         const enterData = await enterRes.json();
-        if (!enterRes.ok || !enterData.token) {
+        const sessionToken = enterData.session_token || enterData.token;
+        if (!enterRes.ok || !sessionToken) {
           throw new Error(`Enter failed for ${username}: ${JSON.stringify(enterData)}`);
         }
         stepCounts.enterOk++;
-        const sessionToken = enterData.token;
 
         // 3. Heartbeat / State Polling
         const stateRes = await fetch(`${TARGET_URL}/api/student/state?active=1`, {
