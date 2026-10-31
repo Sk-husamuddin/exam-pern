@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost, apiDelete } from '../lib/api.js';
 import Loading from '../components/Loading.jsx';
+import FacultyFooter from '../components/FacultyFooter.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   BookOpen,
@@ -676,6 +677,7 @@ export default function FacultyDashboard() {
           </>
         )}
       </main>
+      <FacultyFooter />
     </div>
   );
 }
@@ -685,6 +687,8 @@ const style = {
     fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
     backgroundColor: '#FFFFFF',
     minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
     color: '#000000',
   },
   header: {

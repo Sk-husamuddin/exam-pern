@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { useNavigate } from 'react-router-dom';
 import { LoadingButtonContent } from '../components/Loading.jsx';
+import FacultyFooter from '../components/FacultyFooter.jsx';
 
 export default function FacultyLogin() {
   const [email, setEmail] = useState('');
@@ -220,6 +221,8 @@ export default function FacultyLogin() {
           Create faculty account
         </LoadingButtonContent>
       </button>
+
+      <FacultyFooter style={{ padding: '24px 0 0', borderTop: '1px solid #E4E4E7', marginTop: 24 }} />
     </div>
   );
 }

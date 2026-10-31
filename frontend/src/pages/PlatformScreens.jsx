@@ -263,7 +263,10 @@ export function UnifiedLogin() {
           </div>
         </div>
         <div className="auth-brand-footer">
-          Secure by default <span>•</span> Designed for colleges
+          <div>Secure by default <span>•</span> Designed for colleges</div>
+          <div style={{ marginTop: 6, fontSize: 11, color: '#71717A' }}>
+            developed by <strong style={{ color: '#000000' }}>Y. Babu</strong> and <strong style={{ color: '#000000' }}>Shaik Husamuddin</strong>. CSE department . <strong style={{ color: '#000000' }}>LBRCE</strong>
+          </div>
         </div>
       </section>
 
@@ -387,6 +390,10 @@ export function UnifiedLogin() {
           <p className="form-note">
             By continuing, you agree to our <a href="#">terms</a> and <a href="#">privacy policy</a>.
           </p>
+
+          <footer style={{ marginTop: 24, textAlign: 'center', fontSize: 11, color: '#71717A', borderTop: '1px solid #E4E4E7', paddingTop: 14 }}>
+            developed by <strong style={{ color: '#000000' }}>Y. Babu</strong> and <strong style={{ color: '#000000' }}>Shaik Husamuddin</strong>. CSE department . <strong style={{ color: '#000000' }}>LBRCE</strong>
+          </footer>
         </div>
       </section>
     </div>

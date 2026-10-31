@@ -18,6 +18,7 @@ import {
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost, apiDelete, apiFormPost } from '../lib/api.js';
 import Loading from '../components/Loading.jsx';
+import FacultyFooter from '../components/FacultyFooter.jsx';
 
 export default function StudentsManager() {
   const [students, setStudents] = useState([]);
@@ -480,6 +481,8 @@ export default function StudentsManager() {
           </div>
         </>
       )}
+
+      <FacultyFooter />
     </div>
   );
 }
@@ -493,6 +496,8 @@ const style = {
     color: '#000000',
     backgroundColor: '#FFFFFF',
     minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
   },
   nav: {
     background: '#FFFFFF',

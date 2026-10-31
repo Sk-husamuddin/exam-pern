@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost, apiPut, apiDelete, apiFormPost } from '../lib/api.js';
 import Loading from '../components/Loading.jsx';
+import FacultyFooter from '../components/FacultyFooter.jsx';
 
 export default function QuestionsEditor() {
   const { examId } = useParams();
@@ -333,12 +334,14 @@ export default function QuestionsEditor() {
         )}
         </>
       )}
+
+      <FacultyFooter />
     </div>
   );
 }
 
 const style = {
-  page: { fontFamily: 'Inter, system-ui, sans-serif', maxWidth: 1100, margin: '0 auto', padding: '24px 16px', color: '#000000', backgroundColor: '#FFFFFF', minHeight: '100vh' },
+  page: { fontFamily: 'Inter, system-ui, sans-serif', maxWidth: 1100, margin: '0 auto', padding: '24px 16px', color: '#000000', backgroundColor: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column' },
   nav: {
     background: '#FFFFFF', color: '#000000', padding: '14px 24px', display: 'flex',
     gap: 18, alignItems: 'center', marginBottom: 24, border: '1px solid #E4E4E7', borderRadius: 0,
