@@ -267,7 +267,7 @@ export default function StudentsManager() {
                     name="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Shaik Husamuddin"
+                    placeholder="e.g. SHAIK HUSAMUDDIN"
                     maxLength="100"
                     disabled={creating}
                   />
