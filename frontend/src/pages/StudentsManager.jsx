@@ -251,7 +251,7 @@ export default function StudentsManager() {
                     name="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="e.g. 21CS001"
+                    placeholder="e.g. 24761A05AU"
                     required
                     maxLength="50"
                     disabled={creating}
@@ -267,7 +267,7 @@ export default function StudentsManager() {
                     name="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Ravi Kumar"
+                    placeholder="e.g. Shaik Husamuddin"
                     maxLength="100"
                     disabled={creating}
                   />
