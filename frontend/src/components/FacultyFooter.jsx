@@ -13,11 +13,11 @@ export default function FacultyFooter({ style: customStyle = {} }) {
         ...customStyle,
       }}
     >
-      <span>developed by </span>
+      <span>Developed by </span>
       <strong style={{ color: '#000000', fontWeight: 600 }}>Y. Babu</strong>
       <span> and </span>
       <strong style={{ color: '#000000', fontWeight: 600 }}>Shaik Husamuddin</strong>
-      <span>. CSE department . </span>
+      <span>. Computer Science & Engineering . </span>
       <strong style={{ color: '#000000', fontWeight: 700 }}>LBRCE</strong>
     </footer>
   );
