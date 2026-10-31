@@ -5,13 +5,29 @@ import { Button, FAQ, FormField, Icon, Logo, StatusBadge, featureItems } from '.
 import { supabase, AUTH_BASE, API_BASE } from '../lib/supabase.js';
 
 // Usage: render <LandingPage /> at route "/".
-export function LandingPage() { return <div className="landing"><header className="landing-nav"><Logo /><nav className="desktop-nav"><a href="#features">Features</a><a href="#how-it-works">How it works</a></nav><div className="nav-actions"><a className="nav-login" href="/faculty/login">Faculty login</a><Button href="/student/login" variant="secondary">Student login</Button></div></header><main><section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="eyebrow-dot" />Built for academic integrity</div><h1>Run secure online exams, <em>with live monitoring</em></h1><p>Smart Exam Platform gives colleges a calm, dependable way to create, deliver, and monitor assessments from anywhere.</p><div className="hero-actions"><Button href="/student/login" icon={ArrowRight}>I&apos;m a Student</Button><Button href="/faculty/login" variant="outline">I&apos;m Faculty</Button></div><div className="hero-proof"><div className="proof-avatars"><span>AK</span><span>MR</span><span>+</span></div><span>Trusted by faculty teams who value fair exams</span></div></div><div className="hero-visual"><div className="hero-glow" /><MonitorPreview /></div></section><section className="section section-muted" id="features"><div className="section-heading"><span className="eyebrow">Confidence by design</span><h2>Everything you need to run a fair exam</h2><p>Simple tools for the moments that matter before, during, and after an assessment.</p></div><div className="feature-grid">{featureItems.map(({ icon: I, title, text }) => <article className="feature-card" key={title}><div className="feature-icon"><I size={21} /></div><h3>{title}</h3><p>{text}</p></article>)}</div></section><section className="section how-section" id="how-it-works"><div className="section-heading"><span className="eyebrow">A clear workflow</span><h2>From setup to submitted in three steps</h2></div><div className="steps"><Step n="01" title="Create exam" text="Build your paper, set rules, and choose your monitoring settings." /><Step n="02" title="Share 6-character code" text="Students sign in with their roll number and the secure exam code." /><Step n="03" title="Monitor live" text="Watch progress, resolve issues, and keep the room moving." /></div></section><section className="section faq-section"><div className="section-heading"><span className="eyebrow">Questions, answered</span><h2>Designed for confidence</h2></div><div className="faq-list"><FAQ question="Can students take exams on mobile?" answer="Yes. The student experience is responsive and optimized for modern phones, tablets, and laptops." /><FAQ question="What happens if a student leaves fullscreen?" answer="The session records the event and can automatically lock the attempt based on your exam policy." /><FAQ question="Can I bring existing question banks?" answer="Yes. Faculty can import DOCX and Excel files, then review questions before publishing." /></div></section></main><footer className="footer"><Logo /><span>© 2025 Smart Exam Platform</span><div><a href="#features">Features</a><a href="#how-it-works">How it works</a><a href="/faculty/login">Faculty access</a></div></footer></div> }
+export function LandingPage() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // If confirmation email redirect landed on "/" with #access_token or ?code, send to faculty login
+    if (window.location.hash && (window.location.hash.includes('access_token') || window.location.hash.includes('error'))) {
+      navigate('/faculty/login' + window.location.hash, { replace: true });
+    } else if (window.location.search && (window.location.search.includes('code=') || window.location.search.includes('error='))) {
+      navigate('/faculty/login' + window.location.search, { replace: true });
+    }
+  }, [navigate]);
+
+  return <div className="landing"><header className="landing-nav"><Logo /><nav className="desktop-nav"><a href="#features">Features</a><a href="#how-it-works">How it works</a></nav><div className="nav-actions"><a className="nav-login" href="/faculty/login">Faculty login</a><Button href="/student/login" variant="secondary">Student login</Button></div></header><main><section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="eyebrow-dot" />Built for academic integrity</div><h1>Run secure online exams, <em>with live monitoring</em></h1><p>Smart Exam Platform gives colleges a calm, dependable way to create, deliver, and monitor assessments from anywhere.</p><div className="hero-actions"><Button href="/student/login" icon={ArrowRight}>I&apos;m a Student</Button><Button href="/faculty/login" variant="outline">I&apos;m Faculty</Button></div><div className="hero-proof"><div className="proof-avatars"><span>AK</span><span>MR</span><span>+</span></div><span>Trusted by faculty teams who value fair exams</span></div></div><div className="hero-visual"><div className="hero-glow" /><MonitorPreview /></div></section><section className="section section-muted" id="features"><div className="section-heading"><span className="eyebrow">Confidence by design</span><h2>Everything you need to run a fair exam</h2><p>Simple tools for the moments that matter before, during, and after an assessment.</p></div><div className="feature-grid">{featureItems.map(({ icon: I, title, text }) => <article className="feature-card" key={title}><div className="feature-icon"><I size={21} /></div><h3>{title}</h3><p>{text}</p></article>)}</div></section><section className="section how-section" id="how-it-works"><div className="section-heading"><span className="eyebrow">A clear workflow</span><h2>From setup to submitted in three steps</h2></div><div className="steps"><Step n="01" title="Create exam" text="Build your paper, set rules, and choose your monitoring settings." /><Step n="02" title="Share 6-character code" text="Students sign in with their roll number and the secure exam code." /><Step n="03" title="Monitor live" text="Watch progress, resolve issues, and keep the room moving." /></div></section><section className="section faq-section"><div className="section-heading"><span className="eyebrow">Questions, answered</span><h2>Designed for confidence</h2></div><div className="faq-list"><FAQ question="Can students take exams on mobile?" answer="Yes. The student experience is responsive and optimized for modern phones, tablets, and laptops." /><FAQ question="What happens if a student leaves fullscreen?" answer="The session records the event and can automatically lock the attempt based on your exam policy." /><FAQ question="Can I bring existing question banks?" answer="Yes. Faculty can import DOCX and Excel files, then review questions before publishing." /></div></section></main><footer className="footer"><Logo /><span>© 2025 Smart Exam Platform</span><div><a href="#features">Features</a><a href="#how-it-works">How it works</a><a href="/faculty/login">Faculty access</a></div></footer></div> }
 
 function MonitorPreview() { return <div className="monitor-card"><div className="monitor-head"><div><span className="preview-kicker">Live exam monitor</span><h3>Midterm · Data Structures</h3></div><StatusBadge status="live" /></div><div className="monitor-stats"><div><strong>48</strong><span>Students</span></div><div><strong>42</strong><span>In progress</span></div><div><strong>01:18:42</strong><span>Time left</span></div></div><div className="progress-line"><span style={{ width: '76%' }} /></div><div className="student-list"><div><span className="student-avatar">AS</span><span><b>Aarav Shah</b><small>Question 28 of 40</small></span><StatusBadge status="online" /></div><div><span className="student-avatar">NP</span><span><b>Nina Patel</b><small>Question 31 of 40</small></span><StatusBadge status="online" /></div><div><span className="student-avatar warning">RK</span><span><b>Rahul Kumar</b><small>Fullscreen warning</small></span><StatusBadge status="locked" /></div></div><div className="monitor-foot"><span><Wifi size={15} />All systems operational</span><a href="#">Open monitor <ArrowRight size={14} /></a></div></div> }
 function Step({ n, title, text }) { return <div className="step"><span className="step-num">{n}</span><div><h3>{title}</h3><p>{text}</p></div></div> }
 
 // Usage: render <FacultyAuth /> at route "/faculty/login".
-export function FacultyAuth() { const [signup, setSignup] = useState(false); const [show, setShow] = useState(false); const [loading, setLoading] = useState(false);
+export function FacultyAuth() {
+  const navigate = useNavigate();
+  const [signup, setSignup] = useState(false);
+  const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [banner, setBanner] = useState(null);
@@ -20,6 +36,49 @@ export function FacultyAuth() { const [signup, setSignup] = useState(false); con
   const resendTimerRef = useRef(null);
 
   const emailRedirectTo = window.location.origin + '/faculty/login';
+
+  useEffect(() => {
+    // 1. Process URL hash params (e.g. #access_token=...&type=signup or #error_description=...)
+    if (window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const errorDesc = hashParams.get('error_description');
+      if (errorDesc) {
+        setBanner({ kind: 'err', text: decodeURIComponent(errorDesc.replace(/\+/g, ' ')) });
+      } else if (hashParams.get('type') === 'signup' || hashParams.get('access_token')) {
+        setBanner({ kind: 'ok', text: 'Email confirmed successfully! You can now sign in.' });
+      }
+    }
+
+    // 2. Process URL search query params
+    if (window.location.search) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const errorDesc = searchParams.get('error_description');
+      if (errorDesc) {
+        setBanner({ kind: 'err', text: decodeURIComponent(errorDesc.replace(/\+/g, ' ')) });
+      }
+    }
+
+    // 3. Listen to Supabase auth events (automatic token verification)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session) {
+        setBanner({ kind: 'ok', text: 'Email confirmed! Redirecting to faculty dashboard…' });
+        setTimeout(() => {
+          navigate('/faculty/dashboard', { replace: true });
+        }, 1200);
+      }
+    });
+
+    // 4. If already logged in, redirect to dashboard
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session) {
+        navigate('/faculty/dashboard', { replace: true });
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [navigate]);
 
   const clearBanner = () => setBanner(null);
 
