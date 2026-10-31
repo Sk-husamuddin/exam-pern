@@ -1,6 +1,8 @@
 -- Migration 005: Ultra-fast atomic student enter function
 -- Eliminates multiple network round-trips under the advisory lock.
 
+DROP FUNCTION IF EXISTS fn_student_enter_exam(text,uuid,text,boolean);
+
 CREATE OR REPLACE FUNCTION fn_student_enter_exam(
   p_exam_code TEXT,
   p_user_id UUID,
@@ -20,7 +22,7 @@ RETURNS TABLE (
   max_violations INT,
   entered BOOLEAN,
   entered_at_epoch BIGINT,
-  assigned_q_ids INT[],
+  assigned_q_ids BIGINT[],
   questions_json JSONB
 )
 LANGUAGE plpgsql
@@ -29,7 +31,7 @@ DECLARE
   v_exam RECORD;
   v_session RECORD;
   v_num_questions INT;
-  v_pick_ids INT[];
+  v_pick_ids BIGINT[];
   v_questions_json JSONB := '[]'::JSONB;
   v_now_epoch BIGINT;
   v_entered_epoch BIGINT;
@@ -80,7 +82,7 @@ BEGIN
     exam_sessions.assigned_q_ids,
     exam_sessions.locked,
     exam_sessions.violations,
-    EXTRACT(EPOCH FROM exam_sessions.entered_at)::BIGINT
+    EXTRACT(EPOCH FROM exam_sessions.entered_at)::BIGINT AS entered_at
   INTO v_session;
 
   v_now_epoch := EXTRACT(EPOCH FROM now())::BIGINT;
