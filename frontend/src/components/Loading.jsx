@@ -17,11 +17,11 @@ export default function Loading({ message = 'Loading…', size = 52, color = '#F
         minHeight: '55vh',
         gap: 16,
         padding: '40px 20px',
-        color: '#FFFFFF',
+        color: '#000000',
       }}
     >
       <Clock size={size} color={color} />
-      <p style={{ color: '#A1A1AA', fontSize: 15, margin: 0, fontWeight: 600, letterSpacing: '-0.01em' }}>
+      <p style={{ color: '#71717A', fontSize: 15, margin: 0, fontWeight: 600, letterSpacing: '-0.01em' }}>
         {message}
       </p>
     </div>

@@ -4,7 +4,7 @@
 @tailwind utilities;
 
 /* ==========================================================================
-   Swiss Red Design System (21st.dev / @serafimcloud / Inter · radius 0px)
+   Swiss Red Design System (Light Theme: White background, Black text, Swiss Red accent)
    ========================================================================== */
 :root {
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -16,29 +16,29 @@
   --primary-active: #C80000;
   --primary-foreground: #FFFFFF;
 
-  --secondary: #FFFFFF;
-  --secondary-foreground: #000000;
-  --secondary-hover: #E5E5E5;
+  --secondary: #000000;
+  --secondary-foreground: #FFFFFF;
+  --secondary-hover: #18181B;
 
   --accent: #FDB813;
   --accent-foreground: #000000;
 
-  --muted: #27272A;
-  --muted-foreground: #A1A1AA;
+  --muted: #F4F4F5;
+  --muted-foreground: #71717A;
 
   --destructive: #FF1818;
   --destructive-foreground: #FFFFFF;
 
-  --background: #0A0A0A;
-  --foreground: #FFFFFF;
+  --background: #FFFFFF;
+  --foreground: #000000;
 
-  --card: #121212;
-  --card-foreground: #FFFFFF;
-  --card-secondary: #18181B;
+  --card: #FFFFFF;
+  --card-foreground: #000000;
+  --card-secondary: #FAFAFA;
 
-  --border: #27272A;
-  --border-strong: #3F3F46;
-  --border-contrast: #FFFFFF;
+  --border: #E4E4E7;
+  --border-strong: #D4D4D8;
+  --border-contrast: #000000;
 
   --ring: #FF1818;
 
@@ -57,8 +57,8 @@
 body {
   margin: 0;
   min-width: 320px;
-  background-color: #0A0A0A;
-  color: #FFFFFF;
+  background-color: #FFFFFF;
+  color: #000000;
   font-family: var(--font-sans);
 }
 
@@ -113,37 +113,38 @@ button {
   border-color: #E00000 !important;
 }
 
-/* Secondary: Solid White with Black text */
+/* Secondary: Solid Black with White text */
 .btn-secondary {
-  background: #FFFFFF !important;
-  color: #000000 !important;
-  border-color: #FFFFFF !important;
+  background: #000000 !important;
+  color: #FFFFFF !important;
+  border-color: #000000 !important;
 }
 
 .btn-secondary:hover {
-  background: #E5E5E5 !important;
+  background: #27272A !important;
+  border-color: #27272A !important;
 }
 
-/* Outline: Transparent with 1px White border */
+/* Outline: Transparent with 1px dark border */
 .btn-outline {
-  border: 1px solid #FFFFFF !important;
+  border: 1px solid #18181B !important;
   background: transparent !important;
-  color: #FFFFFF !important;
+  color: #000000 !important;
 }
 
 .btn-outline:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: #F4F4F5 !important;
 }
 
 /* Ghost: Clean text button */
 .btn-ghost {
   background: transparent !important;
-  color: #FFFFFF !important;
+  color: #000000 !important;
   border-color: transparent !important;
 }
 
 .btn-ghost:hover {
-  background: #18181B !important;
+  background: #F4F4F5 !important;
 }
 
 /* Delete / Destructive: Swiss Red */
@@ -221,12 +222,12 @@ button {
   font-size: 14px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #FFFFFF;
+  color: #000000;
 }
 
 .brand b {
   font-weight: 500;
-  color: #A1A1AA;
+  color: #71717A;
 }
 
 .brand-mark {
@@ -300,29 +301,30 @@ button {
 }
 
 .status-ended, .status-offline {
-  background: #27272A !important;
-  color: #A1A1AA !important;
+  background: #F4F4F5 !important;
+  color: #71717A !important;
+  border: 1px solid #E4E4E7;
 }
 
 /* ==========================================================================
-   Unified Login & Auth Pages (Swiss Red Dark Layout)
+   Unified Login & Auth Pages (Swiss Red Light Layout)
    ========================================================================== */
 .auth-page {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 44% 56%;
-  background: #0A0A0A;
-  color: #FFFFFF;
+  background: #FFFFFF;
+  color: #000000;
 }
 
 .auth-brand {
-  background: #000000;
-  color: #FFFFFF;
+  background: #FAFAFA;
+  color: #000000;
   padding: 36px clamp(28px, 6vw, 85px);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  border-right: 1px solid #27272A;
+  border-right: 1px solid #E4E4E7;
 }
 
 .auth-brand-copy {
@@ -336,11 +338,11 @@ button {
   letter-spacing: -0.05em;
   margin: 18px 0;
   font-weight: 800;
-  color: #FFFFFF;
+  color: #000000;
 }
 
 .auth-brand-copy p {
-  color: #A1A1AA;
+  color: #71717A;
   line-height: 1.7;
   font-size: 15px;
 }
@@ -348,17 +350,17 @@ button {
 .auth-quote {
   display: flex;
   gap: 12px;
-  border-top: 1px solid #27272A;
+  border-top: 1px solid #E4E4E7;
   margin-top: 36px;
   padding-top: 20px;
-  color: #E4E4E7;
+  color: #27272A;
   font-size: 12px;
   line-height: 1.6;
 }
 
 .auth-quote small {
   display: block;
-  color: #A1A1AA;
+  color: #71717A;
   margin-top: 6px;
 }
 
@@ -376,7 +378,7 @@ button {
   display: grid;
   place-items: center;
   padding: 45px 24px;
-  background: #0A0A0A;
+  background: #FFFFFF;
 }
 
 .auth-form-wrap {
@@ -392,19 +394,19 @@ button {
   font-weight: 800;
   letter-spacing: -0.04em;
   margin: 12px 0 8px;
-  color: #FFFFFF;
+  color: #000000;
 }
 
 .form-heading p {
   font-size: 13px;
-  color: #A1A1AA;
+  color: #71717A;
   line-height: 1.6;
   margin: 0;
 }
 
 .auth-tabs {
   display: flex;
-  border-bottom: 1px solid #27272A;
+  border-bottom: 1px solid #E4E4E7;
   margin-bottom: 25px;
 }
 
@@ -426,7 +428,7 @@ button {
 }
 
 .auth-tabs button:hover:not(.selected) {
-  color: #FFFFFF;
+  color: #000000;
 }
 
 /* Alerts / Banners */
@@ -438,22 +440,23 @@ button {
   padding: 12px 14px;
   font-size: 12px;
   margin-bottom: 18px;
-  border: 1px solid #27272A;
-  background: #141414;
+  border: 1px solid #E4E4E7;
+  background: #FAFAFA;
+  color: #000000;
 }
 
 .alert.success, .alert.ok {
-  color: #FFFFFF;
+  color: #000000;
   border-left: 3px solid #10B981;
 }
 
 .alert.amber {
-  color: #FFFFFF;
+  color: #000000;
   border-left: 3px solid #FDB813;
 }
 
 .alert.err {
-  color: #FFFFFF;
+  color: #000000;
   border-left: 3px solid #FF1818;
 }
 
@@ -461,9 +464,9 @@ button {
   font-size: 11px;
   font-weight: 700;
   padding: 3px 8px;
-  border: 1px solid #FFFFFF;
-  background: #FFFFFF;
-  color: #000000;
+  border: 1px solid #000000;
+  background: #000000;
+  color: #FFFFFF;
   border-radius: 0px !important;
   cursor: pointer;
   margin-left: 8px;
@@ -478,7 +481,7 @@ button {
   font-size: 11px;
   opacity: 0.85;
   margin-left: auto;
-  color: #A1A1AA;
+  color: #71717A;
 }
 
 /* Fields & Inputs */
@@ -492,18 +495,18 @@ button {
 .field label {
   font-size: 12px;
   font-weight: 700;
-  color: #E4E4E7;
+  color: #000000;
   letter-spacing: -0.01em;
 }
 
 .field input {
   width: 100%;
-  border: 1px solid #27272A;
+  border: 1px solid #E4E4E7;
   border-radius: 0px !important;
   padding: 12px 14px;
   outline: none;
-  color: #FFFFFF;
-  background: #121212;
+  color: #000000;
+  background: #FFFFFF;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -513,7 +516,7 @@ button {
 }
 
 .field input::placeholder {
-  color: #52525B;
+  color: #A1A1AA;
 }
 
 .hint {
@@ -533,11 +536,11 @@ button {
   width: 38px;
   border: 0;
   background: transparent;
-  color: #A1A1AA;
+  color: #71717A;
 }
 
 .input-action button:hover {
-  color: #FFFFFF;
+  color: #000000;
 }
 
 .form-note {
@@ -562,8 +565,8 @@ button {
   flex-direction: column;
   align-items: center;
   padding: 28px 20px;
-  background: #0A0A0A;
-  color: #FFFFFF;
+  background: #FFFFFF;
+  color: #000000;
 }
 
 .status-panel, .loading-center {
@@ -589,18 +592,18 @@ button {
   font-weight: 800;
   margin: 24px 0 8px;
   letter-spacing: -0.03em;
-  color: #FFFFFF;
+  color: #000000;
 }
 
 .loading-center p {
   font-size: 13px;
-  color: #A1A1AA;
+  color: #71717A;
 }
 
 .progress-track {
   height: 3px;
   width: 220px;
-  background: #27272A;
+  background: #E4E4E7;
   border-radius: 0px !important;
   overflow: hidden;
   margin: 24px auto;
@@ -627,14 +630,14 @@ button {
    ========================================================================== */
 .app-shell {
   min-height: 100vh;
-  background: #0A0A0A;
-  color: #FFFFFF;
+  background: #FFFFFF;
+  color: #000000;
 }
 
 .sidebar {
   width: 240px;
-  border-right: 1px solid #27272A;
-  background: #121212;
+  border-right: 1px solid #E4E4E7;
+  background: #FAFAFA;
   padding: 25px 16px;
   display: flex;
   flex-direction: column;
@@ -648,8 +651,8 @@ button {
 
 .topbar {
   height: 64px;
-  background: #121212;
-  border-bottom: 1px solid #27272A;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E4E7;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -659,7 +662,7 @@ button {
 .topbar-title {
   font-weight: 700;
   font-size: 14px;
-  color: #FFFFFF;
+  color: #000000;
 }
 
 .side-nav a {
@@ -667,14 +670,14 @@ button {
   gap: 11px;
   align-items: center;
   padding: 10px 12px;
-  color: #A1A1AA;
+  color: #71717A;
   font-size: 12px;
   border-radius: 0px !important;
   transition: all 0.15s ease;
 }
 
 .side-nav a.active, .side-nav a:hover {
-  background: #18181B;
+  background: #F4F4F5;
   color: #FF1818;
 }
 
@@ -691,7 +694,7 @@ button {
     min-height: 280px;
     padding: 28px;
     border-right: none;
-    border-bottom: 1px solid #27272A;
+    border-bottom: 1px solid #E4E4E7;
   }
   .auth-brand-copy {
     margin: 40px auto 20px;

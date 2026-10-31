@@ -108,4 +108,21 @@ describe('FacultyDashboard', () => {
 
     expect(bodyText()).toContain('No exams yet. Create your first exam above.');
   });
+
+  it('renders Re-conduct button for ended exams', async () => {
+    mockFetch.mockResolvedValue(
+      respondWith({
+        ok: true,
+        exams: [
+          { id: 3, code: 'G7H8I9', title: 'Ended Exam', status: 'ended', qc: 1, sc: 1, duration_min: 30, max_violations: 3 },
+        ],
+      })
+    );
+
+    renderDashboard();
+    await settled();
+
+    const reconductBtn = screen.getByRole('button', { name: /re-conduct/i });
+    expect(reconductBtn).toBeInTheDocument();
+  });
 });

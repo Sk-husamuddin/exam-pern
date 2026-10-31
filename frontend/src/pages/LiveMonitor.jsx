@@ -75,6 +75,7 @@ export default function LiveMonitor() {
 
   async function act(action, sid) {
     if (action === 'end' && !confirm('End the exam for everyone?')) return;
+    if (action === 'reconduct' && !confirm('Re-conduct this exam? Previous student sessions and violations will be reset.')) return;
 
     try {
       const json = await apiPost('/faculty/action', { exam_id: examId, action, sid });
@@ -212,6 +213,9 @@ export default function LiveMonitor() {
             {exam.status === 'live' && (
               <button onClick={() => act('end')} style={style.btnSmRed}>End exam</button>
             )}
+            {exam.status === 'ended' && (
+              <button onClick={() => act('reconduct')} style={style.btnSmRed}>Re-conduct exam</button>
+            )}
             {exam.status !== 'draft' && (
               <button
                 onClick={downloadCsv}
@@ -300,15 +304,15 @@ export default function LiveMonitor() {
 }
 
 const style = {
-  page: { fontFamily: 'Inter, system-ui, sans-serif', maxWidth: 1100, margin: '0 auto', padding: '24px 16px', color: '#FFFFFF', backgroundColor: '#0A0A0A', minHeight: '100vh' },
+  page: { fontFamily: 'Inter, system-ui, sans-serif', maxWidth: 1100, margin: '0 auto', padding: '24px 16px', color: '#000000', backgroundColor: '#FFFFFF', minHeight: '100vh' },
   nav: {
-    background: '#121212', color: '#FFFFFF', padding: '14px 24px', display: 'flex',
-    gap: 18, alignItems: 'center', marginBottom: 24, border: '1px solid #27272A', borderRadius: 0,
+    background: '#FFFFFF', color: '#000000', padding: '14px 24px', display: 'flex',
+    gap: 18, alignItems: 'center', marginBottom: 24, border: '1px solid #E4E4E7', borderRadius: 0,
   },
   link: { color: '#FF1818', textDecoration: 'none', fontWeight: 700 },
   spacer: { flex: 1 },
   card: {
-    background: '#121212', borderRadius: 0, padding: 20, border: '1px solid #27272A', color: '#FFFFFF', marginBottom: 16,
+    background: '#FFFFFF', borderRadius: 0, padding: 20, border: '1px solid #E4E4E7', color: '#000000', marginBottom: 16,
   },
   meta: {
     display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8,
@@ -316,20 +320,21 @@ const style = {
   floatRight: { marginLeft: 'auto' },
   badge: (s) => ({
     padding: '3px 8px', borderRadius: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-    color: s === 'draft' ? '#000000' : '#FFFFFF',
-    background: s === 'live' ? '#FF1818' : s === 'ended' ? '#27272A' : '#FDB813',
+    color: s === 'draft' ? '#000000' : s === 'ended' ? '#71717A' : '#FFFFFF',
+    background: s === 'live' ? '#FF1818' : s === 'ended' ? '#F4F4F5' : '#FDB813',
+    border: s === 'ended' ? '1px solid #E4E4E7' : 'none',
   }),
-  badgeEnded: { padding: '3px 8px', borderRadius: 0, fontSize: 11, fontWeight: 700, color: '#A1A1AA', background: '#27272A' },
-  muted: { color: '#A1A1AA', fontSize: 12 },
-  table: { width: '100%', borderCollapse: 'collapse', background: '#121212', borderRadius: 0, overflow: 'hidden' },
-  th: { background: '#18181B', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #27272A' },
-  td: { padding: '12px 14px', borderBottom: '1px solid #27272A', fontSize: 13, color: '#FFFFFF' },
-  mutedTd: { color: '#A1A1AA', padding: 20 },
+  badgeEnded: { padding: '3px 8px', borderRadius: 0, fontSize: 11, fontWeight: 700, color: '#71717A', background: '#F4F4F5', border: '1px solid #E4E4E7' },
+  muted: { color: '#71717A', fontSize: 12 },
+  table: { width: '100%', borderCollapse: 'collapse', background: '#FFFFFF', border: '1px solid #E4E4E7', borderRadius: 0, overflow: 'hidden' },
+  th: { background: '#F4F4F5', padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#71717A', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #E4E4E7' },
+  td: { padding: '12px 14px', borderBottom: '1px solid #E4E4E7', fontSize: 13, color: '#000000' },
+  mutedTd: { color: '#71717A', padding: 20 },
   dot: { display: 'inline-block', width: 8, height: 8, borderRadius: 0, background: '#71717A', marginRight: 6 },
   dotOn: { background: '#FF1818' },
-  btnSm: { background: '#FFFFFF', color: '#000000', border: '1px solid #FFFFFF', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
-  btnSmGreen: { background: '#FFFFFF', color: '#000000', border: '1px solid #FFFFFF', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
-  btnSmRed: { background: '#FF1818', color: '#FFFFFF', border: '1px solid #FF1818', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700 },
-  btnSmExport: { background: 'transparent', color: '#FFFFFF', border: '1px solid #FFFFFF', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
-  alertErr: { background: '#141414', border: '1px solid #27272A', borderLeft: '3px solid #FF1818', color: '#FFFFFF', padding: 12, borderRadius: 0, marginBottom: 12 },
+  btnSm: { background: '#FFFFFF', color: '#000000', border: '1px solid #E4E4E7', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
+  btnSmGreen: { background: '#FF1818', color: '#FFFFFF', border: '1px solid #FF1818', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
+  btnSmRed: { background: '#FF1818', color: '#FFFFFF', border: '1px solid #FF1818', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
+  btnSmExport: { background: '#FFFFFF', color: '#000000', border: '1px solid #E4E4E7', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
+  alertErr: { background: '#FAFAFA', border: '1px solid #E4E4E7', borderLeft: '3px solid #FF1818', color: '#000000', padding: 12, borderRadius: 0, marginBottom: 12 },
 };

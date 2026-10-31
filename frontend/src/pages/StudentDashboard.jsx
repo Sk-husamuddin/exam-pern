@@ -217,11 +217,11 @@ export default function StudentDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
               <div>
                 <span style={style.eyebrow}>ASSESSMENT PORTAL</span>
-                <h2 style={{ margin: '4px 0 6px', fontSize: 24, color: '#FFFFFF', fontWeight: 800 }}>
+                <h2 style={{ margin: '4px 0 6px', fontSize: 24, color: '#000000', fontWeight: 800 }}>
                   {state?.title || sessionStorage.getItem('exam_student_title') || 'Assigned Exam'}
                 </h2>
-                <div style={{ fontSize: 13, color: '#A1A1AA' }}>
-                  Student: <b style={{ color: '#FFFFFF' }}>{studentName}</b>
+                <div style={{ fontSize: 13, color: '#71717A' }}>
+                  Student: <b style={{ color: '#000000' }}>{studentName}</b>
                   {studentUser.username && studentUser.username !== studentName && (
                     <span> ({studentUser.username})</span>
                   )}
@@ -229,7 +229,7 @@ export default function StudentDashboard() {
               </div>
               {examCode && (
                 <div style={style.codeBox}>
-                  <small style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', color: '#A1A1AA', fontWeight: 700, letterSpacing: '0.05em' }}>Exam Code</small>
+                  <small style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', color: '#71717A', fontWeight: 700, letterSpacing: '0.05em' }}>Exam Code</small>
                   <span style={style.codeText}>{examCode}</span>
                 </div>
               )}
@@ -246,7 +246,7 @@ export default function StudentDashboard() {
                   </div>
                   <div style={style.stat}>
                     <small style={style.statLabel}>Time Remaining</small>
-                    <b id="timeLeft" style={{ fontSize: 18, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <b id="timeLeft" style={{ fontSize: 18, color: '#000000', display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Clock size={16} color="#FF1818" />
                       {fmt(state.seconds_left)}
                     </b>
@@ -269,7 +269,7 @@ export default function StudentDashboard() {
                       </span>
                     </div>
                   ) : state.status === 'ended' ? (
-                    <span style={{ color: '#A1A1AA' }}>This exam has officially ended. Thank you for your submission.</span>
+                    <span style={{ color: '#71717A' }}>This exam has officially ended. Thank you for your submission.</span>
                   ) : state.locked ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <ShieldAlert size={18} color="#FF1818" />
@@ -279,8 +279,8 @@ export default function StudentDashboard() {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Clock size={18} color="#FDB813" />
-                      <span style={{ color: '#FDB813' }}>
+                      <Clock size={18} color="#D97706" />
+                      <span style={{ color: '#92400E' }}>
                         Waiting for faculty to start the exam. Please remain on this screen; the red <b>Start Exam</b> button will activate automatically.
                       </span>
                     </div>
@@ -314,24 +314,24 @@ export default function StudentDashboard() {
                 </div>
               </>
             )}
-            {!state && <p style={{ color: '#A1A1AA' }}>Loading exam details…</p>}
+            {!state && <p style={{ color: '#71717A' }}>Loading exam details…</p>}
           </div>
 
           {/* Exam Security Instructions Card */}
           <div style={style.card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <ShieldAlert size={18} color="#FF1818" />
-              <h3 style={{ margin: 0, fontSize: 16, color: '#FFFFFF', fontWeight: 800 }}>Exam Rules & Security Guidelines</h3>
+              <h3 style={{ margin: 0, fontSize: 16, color: '#000000', fontWeight: 800 }}>Exam Rules & Security Guidelines</h3>
             </div>
             <ul style={style.rules}>
               <li>
-                Clicking <b style={{ color: '#FFFFFF' }}>&quot;Start Exam&quot;</b> will immediately switch your screen into <b style={{ color: '#FFFFFF' }}>fullscreen mode</b> and load your assigned questions.
+                Clicking <b style={{ color: '#000000' }}>&quot;Start Exam&quot;</b> will immediately switch your screen into <b style={{ color: '#000000' }}>fullscreen mode</b> and load your assigned questions.
               </li>
               <li>
-                <b style={{ color: '#FFFFFF' }}>Do not leave fullscreen or switch tabs:</b> Exiting fullscreen, minimizing the window, or switching browser tabs is recorded as a security violation.
+                <b style={{ color: '#000000' }}>Do not leave fullscreen or switch tabs:</b> Exiting fullscreen, minimizing the window, or switching browser tabs is recorded as a security violation.
               </li>
               <li>
-                <b style={{ color: '#FFFFFF' }}>Automatic Lockout:</b> Reaching <b style={{ color: '#FFFFFF' }}>{state && state.max != null ? state.max : 3}</b> violations will lock your test and require faculty intervention.
+                <b style={{ color: '#000000' }}>Automatic Lockout:</b> Reaching <b style={{ color: '#000000' }}>{state && state.max != null ? state.max : 3}</b> violations will lock your test and require faculty intervention.
               </li>
               <li>
                 Keyboard shortcuts (copy, cut, paste, devtools, print screen) and right-click context menus are strictly disabled during the exam.
@@ -353,16 +353,16 @@ const style = {
     maxWidth: 960,
     margin: '0 auto',
     padding: '24px 16px',
-    color: '#FFFFFF',
-    backgroundColor: '#0A0A0A',
+    color: '#000000',
+    backgroundColor: '#FFFFFF',
     minHeight: '100vh',
   },
   nav: {
-    background: '#121212',
-    color: '#FFFFFF',
+    background: '#FFFFFF',
+    color: '#000000',
     padding: '14px 20px',
     borderRadius: 0,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     display: 'flex',
     alignItems: 'center',
     marginBottom: 24,
@@ -370,11 +370,11 @@ const style = {
   },
   navDivider: { color: '#71717A', fontSize: 14 },
   userPill: {
-    background: '#18181B',
-    color: '#FFFFFF',
+    background: '#F4F4F5',
+    color: '#000000',
     padding: '5px 12px',
     borderRadius: 0,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     fontSize: 12,
     fontWeight: 600,
   },
@@ -393,13 +393,13 @@ const style = {
   },
   spacer: { flex: 1 },
   card: {
-    background: '#121212',
+    background: '#FFFFFF',
     borderRadius: 0,
     padding: 24,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     boxShadow: 'none',
     marginBottom: 20,
-    color: '#FFFFFF',
+    color: '#000000',
   },
   eyebrow: {
     fontSize: 11,
@@ -409,8 +409,8 @@ const style = {
     textTransform: 'uppercase',
   },
   codeBox: {
-    background: '#18181B',
-    border: '1px solid #27272A',
+    background: '#F4F4F5',
+    border: '1px solid #E4E4E7',
     borderRadius: 0,
     padding: '8px 14px',
     textAlign: 'center',
@@ -429,14 +429,14 @@ const style = {
     margin: '18px 0',
   },
   stat: {
-    background: '#18181B',
+    background: '#F4F4F5',
     borderRadius: 0,
     padding: 14,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
   },
   statLabel: {
     display: 'block',
-    color: '#A1A1AA',
+    color: '#71717A',
     marginBottom: 6,
     fontSize: 11,
     fontWeight: 700,
@@ -451,17 +451,18 @@ const style = {
     fontWeight: 700,
     letterSpacing: '0.04em',
     textTransform: 'uppercase',
-    color: s === 'draft' ? '#000000' : '#FFFFFF',
-    background: s === 'live' ? '#FF1818' : s === 'ended' ? '#27272A' : '#FDB813',
+    color: s === 'draft' ? '#000000' : s === 'ended' ? '#71717A' : '#FFFFFF',
+    background: s === 'live' ? '#FF1818' : s === 'ended' ? '#F4F4F5' : '#FDB813',
+    border: s === 'ended' ? '1px solid #E4E4E7' : 'none',
   }),
   statusNoticeBox: (btnOn, status, locked) => ({
     padding: 14,
     borderRadius: 0,
     fontSize: 13,
     lineHeight: 1.5,
-    background: '#18181B',
-    border: `1px solid ${btnOn ? '#FF1818' : locked ? '#FF1818' : '#27272A'}`,
-    color: '#FFFFFF',
+    background: '#FAFAFA',
+    border: `1px solid ${btnOn ? '#FF1818' : locked ? '#FF1818' : '#E4E4E7'}`,
+    color: '#000000',
     marginTop: 10,
   }),
   btnStartExamRed: {
@@ -481,9 +482,9 @@ const style = {
     transition: 'background-color 0.15s ease',
   },
   btnDisabled: {
-    background: '#27272A',
+    background: '#F4F4F5',
     color: '#71717A',
-    border: '1px solid #3F3F46',
+    border: '1px solid #E4E4E7',
     padding: '12px 24px',
     borderRadius: 0,
     cursor: 'not-allowed',
@@ -495,12 +496,12 @@ const style = {
     paddingLeft: 20,
     lineHeight: 1.8,
     fontSize: 13,
-    color: '#A1A1AA',
+    color: '#71717A',
   },
   alert: {
-    color: '#FFFFFF',
-    background: '#141414',
-    border: '1px solid #27272A',
+    color: '#000000',
+    background: '#FAFAFA',
+    border: '1px solid #E4E4E7',
     borderLeft: '3px solid #FF1818',
     padding: 12,
     borderRadius: 0,

@@ -53,10 +53,10 @@ export class ErrorBoundary extends React.Component {
             maxWidth: 560,
             margin: '8vh auto',
             padding: 24,
-            border: '1px solid #27272A',
+            border: '1px solid #E4E4E7',
             borderRadius: 0,
-            background: '#121212',
-            color: '#FFFFFF',
+            background: '#FFFFFF',
+            color: '#000000',
           },
         },
         React.createElement(
@@ -66,7 +66,7 @@ export class ErrorBoundary extends React.Component {
         ),
         React.createElement(
           'p',
-          { style: { fontSize: 14, color: '#E4E4E7', marginBottom: 18 } },
+          { style: { fontSize: 14, color: '#71717A', marginBottom: 18 } },
           message
         ),
         process.env.NODE_ENV === 'development' && errorInfo
@@ -113,7 +113,7 @@ export class ErrorBoundary extends React.Component {
               onClick: this.handleBackToLogin,
               style: {
                 background: '#FFFFFF',
-                border: '1px solid #FFFFFF',
+                border: '1px solid #E4E4E7',
                 color: '#000000',
                 padding: '9px 16px',
                 borderRadius: 0,

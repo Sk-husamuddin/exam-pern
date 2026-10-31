@@ -222,6 +222,38 @@ router.post('/exams/:examId/end', verifyFaculty, async (req, res) => {
 });
 
 // ------------------------------------------------------------------
+// Re-conduct exam (reset ended/draft exam with fresh student sessions)
+// ------------------------------------------------------------------
+router.post('/exams/:examId/reconduct', verifyFaculty, async (req, res) => {
+  try {
+    const { examId } = req.params;
+    const targetStatus = req.body?.status === 'live' ? 'live' : 'draft';
+
+    const exam = await query('SELECT id FROM exams WHERE id = $1 AND faculty_id = $2', [examId, req.faculty.id]);
+    if (exam.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
+
+    const qcount = await query('SELECT COUNT(*) FROM questions WHERE exam_id = $1', [examId]);
+    if (parseInt(qcount.rows[0].count, 10) === 0) {
+      return res.status(400).json({ error: 'Add at least one question first' });
+    }
+
+    // Reset student sessions so students can re-enter fresh
+    await query('DELETE FROM exam_sessions WHERE exam_id = $1', [examId]);
+
+    // Reset status to draft (or live)
+    await query(
+      `UPDATE exams SET status = $1, started_at = ${targetStatus === 'live' ? 'now()' : 'NULL'} WHERE id = $2 AND faculty_id = $3`,
+      [targetStatus, examId, req.faculty.id]
+    );
+
+    res.json({ ok: true, message: `Exam re-conducted successfully (${targetStatus})` });
+  } catch (err) {
+    console.error('POST /exams/:id/reconduct error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ------------------------------------------------------------------
 // Import .docx: parse and return preview items
 // ------------------------------------------------------------------
 router.post('/questions/import-docx', verifyFaculty, uploadDocx.single('file'), async (req, res) => {
@@ -674,6 +706,17 @@ router.post('/action', verifyFaculty, async (req, res) => {
       await query(
         `UPDATE exams SET status = 'ended' WHERE id = $1 AND status = 'live'`,
         [exam_id]
+      );
+    } else if (action === 'reconduct') {
+      const qcount = await query('SELECT COUNT(*) FROM questions WHERE exam_id = $1', [exam_id]);
+      if (parseInt(qcount.rows[0].count, 10) === 0) {
+        return res.status(400).json({ error: 'Add at least one question first' });
+      }
+      await query('DELETE FROM exam_sessions WHERE exam_id = $1', [exam_id]);
+      const targetStatus = req.body?.status === 'live' ? 'live' : 'draft';
+      await query(
+        `UPDATE exams SET status = $1, started_at = ${targetStatus === 'live' ? 'now()' : 'NULL'} WHERE id = $2 AND faculty_id = $3`,
+        [targetStatus, exam_id, req.faculty.id]
       );
     } else if (action === 'lock' || action === 'unlock') {
       if (!sid) return res.status(400).json({ error: 'sid is required' });

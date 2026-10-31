@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   Copy,
   Check,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function FacultyDashboard() {
@@ -136,6 +137,21 @@ export default function FacultyDashboard() {
       await fetchExams();
     } catch (err) {
       alert(err.message || 'End failed');
+    }
+  }
+
+  async function reconductExam(id) {
+    if (!confirm('Re-conduct this exam? Previous student sessions and violations will be reset so students can take it again.')) return;
+    try {
+      const json = await apiPost(`/faculty/exams/${id}/reconduct`, { status: 'draft' });
+      if (json && json.ok) {
+        setFlash({ type: 'ok', msg: 'Exam has been reset to draft for re-conducting! You can start it whenever ready.' });
+        await fetchExams();
+      } else {
+        alert(json && json.error ? json.error : 'Failed to re-conduct exam');
+      }
+    } catch (err) {
+      alert(err.message || 'Re-conduct failed');
     }
   }
 
@@ -566,6 +582,17 @@ export default function FacultyDashboard() {
                                   </button>
                                 )}
 
+                                {e.status === 'ended' && (
+                                  <button
+                                    onClick={() => reconductExam(e.id)}
+                                    style={style.btnActionReconduct}
+                                    title="Re-conduct this ended exam"
+                                  >
+                                    <RotateCcw size={13} />
+                                    <span>Re-conduct</span>
+                                  </button>
+                                )}
+
                                 {e.status !== 'live' && (
                                   <button
                                     onClick={() => deleteExam(e.id)}
@@ -627,8 +654,20 @@ export default function FacultyDashboard() {
                     </>
                   )}
                   {selected.status !== 'draft' && (
-                    <div style={style.lockAlert}>
-                      This exam is {selected.status}, so its questions and settings are locked.
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={style.lockAlert}>
+                        This exam is {selected.status}, so its questions and settings are locked.
+                      </div>
+                      {selected.status === 'ended' && (
+                        <button
+                          onClick={() => reconductExam(selected.id)}
+                          style={style.btnActionReconduct}
+                          title="Re-conduct this exam"
+                        >
+                          <RotateCcw size={14} />
+                          <span>Re-conduct exam</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -644,13 +683,13 @@ export default function FacultyDashboard() {
 const style = {
   pageWrapper: {
     fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#FFFFFF',
     minHeight: '100vh',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   header: {
-    backgroundColor: '#121212',
-    borderBottom: '1px solid #27272A',
+    backgroundColor: '#FFFFFF',
+    borderBottom: '1px solid #E4E4E7',
     position: 'sticky',
     top: 0,
     zIndex: 20,
@@ -683,13 +722,13 @@ const style = {
   brandTitle: {
     fontSize: 17,
     fontWeight: 800,
-    color: '#FFFFFF',
+    color: '#000000',
     display: 'block',
     letterSpacing: '-0.02em',
   },
   brandSubtitle: {
     fontSize: 12,
-    color: '#A1A1AA',
+    color: '#71717A',
     display: 'block',
   },
   headerActions: {
@@ -702,8 +741,8 @@ const style = {
     alignItems: 'center',
     gap: 8,
     padding: '6px 14px',
-    backgroundColor: '#18181B',
-    border: '1px solid #27272A',
+    backgroundColor: '#F4F4F5',
+    border: '1px solid #E4E4E7',
     borderRadius: 0,
   },
   roleDot: {
@@ -715,7 +754,7 @@ const style = {
   userRole: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#FFFFFF',
+    color: '#000000',
   },
   btnLogout: {
     display: 'inline-flex',
@@ -747,10 +786,10 @@ const style = {
     marginBottom: 24,
   },
   statCard: {
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
     borderRadius: 0,
     padding: 20,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     display: 'flex',
     alignItems: 'center',
     gap: 16,
@@ -767,7 +806,7 @@ const style = {
   statLabel: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#A1A1AA',
+    color: '#71717A',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     display: 'block',
@@ -776,7 +815,7 @@ const style = {
   statValue: {
     fontSize: 26,
     fontWeight: 800,
-    color: '#FFFFFF',
+    color: '#000000',
     lineHeight: 1,
   },
   liveDot: {
@@ -795,9 +834,9 @@ const style = {
     textDecoration: 'none',
   },
   card: {
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
     borderRadius: 0,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     marginBottom: 28,
     overflow: 'hidden',
   },
@@ -808,14 +847,14 @@ const style = {
     alignItems: 'center',
     cursor: 'pointer',
     userSelect: 'none',
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
     transition: 'background-color 0.15s ease',
   },
   createIconBadge: {
     width: 36,
     height: 36,
     borderRadius: 0,
-    backgroundColor: '#18181B',
+    backgroundColor: '#F4F4F5',
     color: '#FF1818',
     display: 'flex',
     alignItems: 'center',
@@ -825,20 +864,20 @@ const style = {
     margin: 0,
     fontSize: 16,
     fontWeight: 700,
-    color: '#FFFFFF',
+    color: '#000000',
   },
   createSubtitle: {
     margin: '2px 0 0',
     fontSize: 12,
-    color: '#A1A1AA',
+    color: '#71717A',
   },
   toggleIcon: {
-    color: '#A1A1AA',
+    color: '#71717A',
   },
   formContainer: {
     padding: '0 22px 22px',
-    borderTop: '1px solid #27272A',
-    backgroundColor: '#141414',
+    borderTop: '1px solid #E4E4E7',
+    backgroundColor: '#FAFAFA',
   },
   formGrid: {
     display: 'grid',
@@ -855,7 +894,7 @@ const style = {
   inputLabel: {
     fontSize: 13,
     fontWeight: 700,
-    color: '#E4E4E7',
+    color: '#000000',
   },
   requiredStar: {
     color: '#FF1818',
@@ -874,11 +913,11 @@ const style = {
   input: {
     width: '100%',
     padding: '10px 14px',
-    backgroundColor: '#18181B',
-    border: '1px solid #27272A',
+    backgroundColor: '#FFFFFF',
+    border: '1px solid #E4E4E7',
     borderRadius: 0,
     fontSize: 14,
-    color: '#FFFFFF',
+    color: '#000000',
     outline: 'none',
     transition: 'border-color 0.15s, box-shadow 0.15s',
     boxSizing: 'border-box',
@@ -912,7 +951,7 @@ const style = {
     gap: 8,
     backgroundColor: '#FFFFFF',
     color: '#000000',
-    border: '1px solid #FFFFFF',
+    border: '1px solid #E4E4E7',
     padding: '10px 18px',
     borderRadius: 0,
     fontSize: 14,
@@ -932,19 +971,19 @@ const style = {
   sectionTitle: {
     fontSize: 18,
     fontWeight: 800,
-    color: '#FFFFFF',
+    color: '#000000',
     letterSpacing: '-0.02em',
     margin: 0,
   },
   sectionSubtitle: {
     fontSize: 13,
-    color: '#A1A1AA',
+    color: '#71717A',
     margin: '3px 0 0',
   },
   tableCard: {
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
     borderRadius: 0,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     overflow: 'hidden',
   },
   table: {
@@ -953,26 +992,26 @@ const style = {
     textAlign: 'left',
   },
   th: {
-    backgroundColor: '#18181B',
+    backgroundColor: '#F4F4F5',
     padding: '13px 18px',
     fontSize: 11,
     fontWeight: 700,
-    color: '#A1A1AA',
+    color: '#71717A',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    borderBottom: '1px solid #27272A',
+    borderBottom: '1px solid #E4E4E7',
   },
   tr: {
-    borderBottom: '1px solid #27272A',
+    borderBottom: '1px solid #E4E4E7',
     transition: 'background-color 0.15s ease',
   },
   trSelected: {
-    backgroundColor: '#1A1A1E',
+    backgroundColor: '#F4F4F5',
   },
   td: {
     padding: '14px 18px',
     fontSize: 14,
-    color: '#FFFFFF',
+    color: '#000000',
     verticalAlign: 'middle',
   },
   examTitleBtn: {
@@ -984,7 +1023,7 @@ const style = {
   },
   examTitleText: {
     fontWeight: 600,
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 14,
   },
   codeWrapper: {
@@ -996,12 +1035,12 @@ const style = {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,
     fontWeight: 700,
-    color: '#FFFFFF',
-    backgroundColor: '#18181B',
+    color: '#FF1818',
+    backgroundColor: '#F4F4F5',
     padding: '3px 8px',
     borderRadius: 0,
     letterSpacing: '0.08em',
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
   },
   copyBtn: {
     background: 'none',
@@ -1010,15 +1049,15 @@ const style = {
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
-    color: '#A1A1AA',
+    color: '#71717A',
   },
   statusBadge: (status) => {
     const config = {
       live: { bg: '#FF1818', text: '#FFFFFF', dot: '#FFFFFF' },
-      ended: { bg: '#27272A', text: '#A1A1AA', dot: '#71717A' },
+      ended: { bg: '#F4F4F5', text: '#71717A', dot: '#71717A' },
       draft: { bg: '#FDB813', text: '#000000', dot: '#000000' },
     };
-    const c = config[status] || { bg: '#27272A', text: '#A1A1AA', dot: '#71717A' };
+    const c = config[status] || { bg: '#F4F4F5', text: '#71717A', dot: '#71717A' };
     return {
       display: 'inline-flex',
       alignItems: 'center',
@@ -1031,6 +1070,7 @@ const style = {
       backgroundColor: c.bg,
       color: c.text,
       textTransform: 'uppercase',
+      border: status === 'ended' ? '1px solid #E4E4E7' : 'none',
     };
   },
   statusDot: (status) => {
@@ -1048,12 +1088,12 @@ const style = {
   },
   countPill: {
     fontSize: 13,
-    color: '#A1A1AA',
+    color: '#71717A',
     fontWeight: 500,
   },
   durationText: {
     fontSize: 13,
-    color: '#A1A1AA',
+    color: '#71717A',
     fontWeight: 500,
   },
   actionsCell: {
@@ -1065,7 +1105,7 @@ const style = {
   btnActionSecondary: {
     backgroundColor: '#FFFFFF',
     color: '#000000',
-    border: '1px solid #FFFFFF',
+    border: '1px solid #E4E4E7',
     padding: '6px 12px',
     borderRadius: 0,
     fontSize: 12,
@@ -1100,7 +1140,7 @@ const style = {
     gap: 5,
   },
   btnActionEnd: {
-    backgroundColor: '#27272A',
+    backgroundColor: '#F4F4F5',
     color: '#FF1818',
     border: '1px solid #FF1818',
     padding: '6px 12px',
@@ -1111,6 +1151,20 @@ const style = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 5,
+  },
+  btnActionReconduct: {
+    backgroundColor: '#FF1818',
+    color: '#FFFFFF',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: 0,
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    transition: 'background-color 0.15s ease',
   },
   btnActionDelete: {
     backgroundColor: 'transparent',
@@ -1138,14 +1192,14 @@ const style = {
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#A1A1AA',
+    color: '#71717A',
     margin: 0,
   },
   detailCard: {
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
     borderRadius: 0,
     padding: 24,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     marginTop: 24,
   },
   detailHeader: {
@@ -1159,17 +1213,17 @@ const style = {
     margin: 0,
     fontSize: 20,
     fontWeight: 800,
-    color: '#FFFFFF',
+    color: '#000000',
     letterSpacing: '-0.02em',
   },
   detailSubtitle: {
     margin: '6px 0 0',
     fontSize: 13,
-    color: '#A1A1AA',
+    color: '#71717A',
   },
   detailCodeBox: {
-    backgroundColor: '#18181B',
-    border: '1px solid #27272A',
+    backgroundColor: '#F4F4F5',
+    border: '1px solid #E4E4E7',
     borderRadius: 0,
     padding: '10px 16px',
     textAlign: 'center',
@@ -1177,7 +1231,7 @@ const style = {
   detailCodeLabel: {
     display: 'block',
     fontSize: 10,
-    color: '#A1A1AA',
+    color: '#71717A',
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
@@ -1196,21 +1250,21 @@ const style = {
     gap: 12,
     flexWrap: 'wrap',
     paddingTop: 16,
-    borderTop: '1px solid #27272A',
+    borderTop: '1px solid #E4E4E7',
   },
   lockAlert: {
-    backgroundColor: '#18181B',
-    color: '#FDB813',
-    border: '1px solid #27272A',
+    backgroundColor: '#FAFAFA',
+    color: '#B45309',
+    border: '1px solid #FDE68A',
     fontSize: 13,
     padding: '8px 14px',
     borderRadius: 0,
     fontWeight: 600,
   },
   alertOk: {
-    backgroundColor: '#141414',
-    color: '#FFFFFF',
-    border: '1px solid #27272A',
+    backgroundColor: '#FAFAFA',
+    color: '#000000',
+    border: '1px solid #E4E4E7',
     borderLeft: '3px solid #10B981',
     padding: '12px 18px',
     borderRadius: 0,
@@ -1221,9 +1275,9 @@ const style = {
     alignItems: 'center',
   },
   alertErr: {
-    backgroundColor: '#141414',
-    color: '#FFFFFF',
-    border: '1px solid #27272A',
+    backgroundColor: '#FAFAFA',
+    color: '#000000',
+    border: '1px solid #E4E4E7',
     borderLeft: '3px solid #FF1818',
     padding: '12px 18px',
     borderRadius: 0,
@@ -1234,9 +1288,9 @@ const style = {
     alignItems: 'center',
   },
   btnRetry: {
-    backgroundColor: '#FFFFFF',
-    border: '1px solid #FFFFFF',
-    color: '#000000',
+    backgroundColor: '#000000',
+    border: '1px solid #000000',
+    color: '#FFFFFF',
     padding: '4px 12px',
     borderRadius: 0,
     fontSize: 12,

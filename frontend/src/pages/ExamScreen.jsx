@@ -372,12 +372,12 @@ export default function ExamScreen() {
       <header style={style.bar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <b id="examTitle" data-testid="examTitle">{data?.title || 'Exam'}</b>
-          <span style={{ color: '#64748b' }}>&middot;</span>
-          <span id="studentRollNo" data-testid="studentRollNo" style={{ color: '#cbd5e1', fontSize: 13, fontWeight: 500 }}>
+          <span style={{ color: '#71717A' }}>&middot;</span>
+          <span id="studentRollNo" data-testid="studentRollNo" style={{ color: '#71717A', fontSize: 13, fontWeight: 500 }}>
             {studentRollNo ? `Roll No: ${studentRollNo}` : ''}
           </span>
-          {studentRollNo && <span style={{ color: '#64748b' }}>&middot;</span>}
-          <span id="studentName" data-testid="studentName" style={{ color: '#f8fafc', fontSize: 13, fontWeight: 600 }}>
+          {studentRollNo && <span style={{ color: '#71717A' }}>&middot;</span>}
+          <span id="studentName" data-testid="studentName" style={{ color: '#000000', fontSize: 13, fontWeight: 600 }}>
             {studentName}
           </span>
         </div>
@@ -405,7 +405,7 @@ export default function ExamScreen() {
           {data.locked ? (
             <div style={style.card}>
               <h2 style={{ color: '#FF1818', marginTop: 0, fontWeight: 800 }}>Exam locked</h2>
-              <p style={{ fontSize: 16, lineHeight: 1.6, color: '#FFFFFF' }}>
+              <p style={{ fontSize: 16, lineHeight: 1.6, color: '#000000' }}>
                 Your exam was locked because of too many violations (<b style={{ color: '#FF1818' }}>{data.violations}/{data.max || 3}</b>). Please contact the faculty to unlock your exam.
               </p>
               <Link to="/student/dashboard" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
@@ -414,16 +414,16 @@ export default function ExamScreen() {
             </div>
           ) : data.status === 'ended' ? (
             <div style={style.card}>
-              <h2 style={{ marginTop: 0, color: '#FFFFFF', fontWeight: 800 }}>Exam ended</h2>
-              <p style={{ fontSize: 16, color: '#E4E4E7' }}>Thank you. Your exam has ended.</p>
+              <h2 style={{ marginTop: 0, color: '#000000', fontWeight: 800 }}>Exam ended</h2>
+              <p style={{ fontSize: 16, color: '#71717A' }}>Thank you. Your exam has ended.</p>
               <Link to="/student/dashboard" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
                 Back to dashboard
               </Link>
             </div>
           ) : data.status === 'kicked' ? (
             <div style={style.card}>
-              <h2 style={{ marginTop: 0, color: '#FFFFFF', fontWeight: 800 }}>Session expired</h2>
-              <p style={{ fontSize: 16, color: '#E4E4E7' }}>This student session is no longer active. Please sign in again.</p>
+              <h2 style={{ marginTop: 0, color: '#000000', fontWeight: 800 }}>Session expired</h2>
+              <p style={{ fontSize: 16, color: '#71717A' }}>This student session is no longer active. Please sign in again.</p>
               <Link to="/" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
                 Login
               </Link>
@@ -433,8 +433,8 @@ export default function ExamScreen() {
               <div
                 data-testid="studentExamBadge"
                 style={{
-                  background: '#18181B',
-                  border: '1px solid #27272A',
+                  background: '#F4F4F5',
+                  border: '1px solid #E4E4E7',
                   borderRadius: 0,
                   padding: '12px 18px',
                   display: 'flex',
@@ -446,22 +446,22 @@ export default function ExamScreen() {
                 }}
               >
                 <div>
-                  <span style={{ color: '#A1A1AA', marginRight: 6 }}>Student Name:</span>
-                  <strong style={{ color: '#FFFFFF' }}>{studentName}</strong>
+                  <span style={{ color: '#71717A', marginRight: 6 }}>Student Name:</span>
+                  <strong style={{ color: '#000000' }}>{studentName}</strong>
                 </div>
                 <div>
-                  <span style={{ color: '#A1A1AA', marginRight: 6 }}>Roll Number:</span>
-                  <strong style={{ color: '#FFFFFF' }}>{studentRollNo || '—'}</strong>
+                  <span style={{ color: '#71717A', marginRight: 6 }}>Roll Number:</span>
+                  <strong style={{ color: '#000000' }}>{studentRollNo || '—'}</strong>
                 </div>
               </div>
 
               {Array.isArray(data.questions) && data.questions.length > 0 ? (
                 data.questions.map((q, idx) => (
                   <div key={q.id || idx}>
-                    <h2 style={{ marginBottom: 12, color: '#FFFFFF', fontSize: 20, fontWeight: 800 }}>
+                    <h2 style={{ marginBottom: 12, color: '#000000', fontSize: 20, fontWeight: 800 }}>
                       Question {q.position != null ? q.position : idx + 1}
                       {data.questions.length > 1 && (
-                        <span style={{ fontSize: 14, fontWeight: 500, color: '#A1A1AA', marginLeft: 10 }}>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: '#71717A', marginLeft: 10 }}>
                           ({idx + 1} of {data.questions.length})
                         </span>
                       )}
@@ -473,7 +473,7 @@ export default function ExamScreen() {
                 ))
               ) : (
                 <div>
-                  <h2 style={{ marginBottom: 16, color: '#FFFFFF', fontSize: 20, fontWeight: 800 }}>Question {data.position || ''}</h2>
+                  <h2 style={{ marginBottom: 16, color: '#000000', fontSize: 20, fontWeight: 800 }}>Question {data.position || ''}</h2>
                   <div style={style.question}>
                     {data.question || 'No question has been assigned yet. Please contact faculty.'}
                   </div>
@@ -482,7 +482,7 @@ export default function ExamScreen() {
             </div>
           ) : (
             <div style={style.card}>
-              <p style={{ color: '#A1A1AA', margin: 0, fontSize: 15 }}>
+              <p style={{ color: '#71717A', margin: 0, fontSize: 15 }}>
                 Waiting for the faculty to start the exam…
               </p>
             </div>
@@ -495,8 +495,8 @@ export default function ExamScreen() {
       {showOverlay && (
         <div id="fsOverlay" className="overlay" style={style.overlay}>
           <div style={style.overlayCard}>
-            <h2 style={{ marginTop: 0, color: '#FFFFFF', fontWeight: 800 }}>Return to fullscreen to continue</h2>
-            <p style={{ fontSize: 14, lineHeight: 1.5, color: '#e5e7eb' }}>
+            <h2 style={{ marginTop: 0, color: '#000000', fontWeight: 800 }}>Return to fullscreen to continue</h2>
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: '#71717A' }}>
               The exam is live and your question is ready. Click below to enter fullscreen.
               Switching tabs or leaving fullscreen is recorded as a violation.
             </p>
@@ -515,31 +515,31 @@ export default function ExamScreen() {
 
       <style>{`
         .exam { user-select: none; -webkit-user-select: none }
-        body.exam, #root.exam { background: #0A0A0A; }
+        body.exam, #root.exam { background: #FFFFFF; }
       `}</style>
     </div>
   );
 }
 
 const style = {
-  examRoot: { fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#0A0A0A', minHeight: '100vh', color: '#FFFFFF' },
+  examRoot: { fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#FFFFFF', minHeight: '100vh', color: '#000000' },
   bar: {
-    background: '#121212', color: '#FFFFFF', padding: '14px 24px',
+    background: '#FFFFFF', color: '#000000', padding: '14px 24px',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    borderBottom: '1px solid #27272A',
+    borderBottom: '1px solid #E4E4E7',
   },
   timer: { fontSize: 20, fontWeight: 800, color: '#FF1818', fontFamily: 'ui-monospace, monospace' },
   main: { maxWidth: 900, margin: '30px auto', padding: '0 20px' },
-  muted: { color: '#A1A1AA' },
+  muted: { color: '#71717A' },
   card: {
-    background: '#121212', borderRadius: 0, padding: 28,
-    border: '1px solid #27272A', color: '#FFFFFF',
+    background: '#FFFFFF', borderRadius: 0, padding: 28,
+    border: '1px solid #E4E4E7', color: '#000000',
     boxShadow: 'none',
   },
   question: {
     whiteSpace: 'pre-wrap', fontSize: 18, lineHeight: 1.65,
-    background: '#18181B', padding: 24, borderRadius: 0,
-    border: '1px solid #27272A', color: '#FFFFFF',
+    background: '#FAFAFA', padding: 24, borderRadius: 0,
+    border: '1px solid #E4E4E7', color: '#000000',
     boxShadow: 'none',
   },
   btnPrimaryLink: {
@@ -555,23 +555,23 @@ const style = {
     marginTop: 14,
   },
   overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)',
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 99, textAlign: 'center', color: '#FFFFFF', fontFamily: 'Inter, system-ui, sans-serif',
+    zIndex: 99, textAlign: 'center', color: '#000000', fontFamily: 'Inter, system-ui, sans-serif',
   },
-  overlayCard: { maxWidth: 420, background: '#121212', border: '1px solid #27272A', padding: 28, borderRadius: 0 },
+  overlayCard: { maxWidth: 420, background: '#FFFFFF', border: '1px solid #E4E4E7', padding: 28, borderRadius: 0 },
   btn: {
     background: '#FF1818', color: '#FFFFFF', border: '1px solid #FF1818', padding: '10px 18px',
     borderRadius: 0, cursor: 'pointer', fontSize: 14, marginTop: 10, fontWeight: 700,
   },
   alert: {
-    background: '#141414', border: '1px solid #27272A', borderLeft: '3px solid #FF1818',
-    color: '#FFFFFF', padding: '10px 14px',
+    background: '#FAFAFA', border: '1px solid #E4E4E7', borderLeft: '3px solid #FF1818',
+    color: '#000000', padding: '10px 14px',
     borderRadius: 0, margin: '14px 20px 0', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
   },
   alertErr: {
-    background: '#141414', border: '1px solid #27272A', borderLeft: '3px solid #FF1818',
-    color: '#FFFFFF', padding: '10px 14px',
+    background: '#FAFAFA', border: '1px solid #E4E4E7', borderLeft: '3px solid #FF1818',
+    color: '#000000', padding: '10px 14px',
     borderRadius: 0, margin: '14px 20px 0', maxWidth: 900, marginLeft: 'auto', marginRight: 'auto',
   },
 };

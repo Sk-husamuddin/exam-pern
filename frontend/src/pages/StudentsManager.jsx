@@ -220,11 +220,11 @@ export default function StudentsManager() {
 
           {/* Info Banner */}
           <div style={style.infoBanner}>
-            <div style={{ fontWeight: 700, color: '#FFFFFF', marginBottom: 2 }}>
+            <div style={{ fontWeight: 700, color: '#000000', marginBottom: 2 }}>
               Default Student Credentials
             </div>
-            <div style={{ color: '#A1A1AA', fontSize: 13, lineHeight: 1.5 }}>
-              Every student&apos;s <b style={{ color: '#FFFFFF' }}>password is identical to their username</b> (roll number). Students log in with their roll number, that password, and the exam code.
+            <div style={{ color: '#71717A', fontSize: 13, lineHeight: 1.5 }}>
+              Every student&apos;s <b style={{ color: '#000000' }}>password is identical to their username</b> (roll number). Students log in with their roll number, that password, and the exam code.
             </div>
           </div>
 
@@ -236,7 +236,7 @@ export default function StudentsManager() {
                 <div style={style.cardIconBg}>
                   <UserPlus size={18} color="#FF1818" />
                 </div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#FFFFFF' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#000000' }}>
                   1. Create manually
                 </h3>
               </div>
@@ -302,12 +302,12 @@ export default function StudentsManager() {
                 <div style={style.cardIconBg}>
                   <FileSpreadsheet size={18} color="#FF1818" />
                 </div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#FFFFFF' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#000000' }}>
                   2. Import from Excel / CSV
                 </h3>
               </div>
               <p style={{ ...style.muted, marginBottom: 12 }}>
-                File (.xlsx or .csv): <b style={{ color: '#FFFFFF' }}>Column A = roll number</b>, <b style={{ color: '#FFFFFF' }}>Column B = full name</b>.{' '}
+                File (.xlsx or .csv): <b style={{ color: '#000000' }}>Column A = roll number</b>, <b style={{ color: '#000000' }}>Column B = full name</b>.{' '}
                 <a
                   href="data:text/csv;charset=utf-8,username%2Cname%0A21CS001%2CRavi%20Kumar%0A21CS002%2CPriya%20Sharma"
                   download="sample_students.csv"
@@ -344,10 +344,10 @@ export default function StudentsManager() {
                         <FileSpreadsheet size={22} color="#FF1818" className="spin" />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF' }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: '#000000' }}>
                           Uploading & Processing Roster…
                         </div>
-                        <div style={{ fontSize: 12, color: '#A1A1AA', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: '#71717A', marginTop: 2 }}>
                           Reading rows, hashing student passwords, and creating database profiles.
                         </div>
                       </div>
@@ -395,7 +395,7 @@ export default function StudentsManager() {
           <div style={style.tableSection}>
             <div style={style.tableHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#FFFFFF' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#000000' }}>
                   Enrolled Students ({total})
                 </h3>
               </div>
@@ -447,7 +447,7 @@ export default function StudentsManager() {
                           <span style={style.codePill}>{s && s.username}</span>
                         </td>
                         <td style={style.td}>
-                          <span style={{ fontWeight: 600, color: '#FFFFFF' }}>
+                          <span style={{ fontWeight: 600, color: '#000000' }}>
                             {s && (s.name || s.username)}
                           </span>
                         </td>
@@ -490,16 +490,16 @@ const style = {
     maxWidth: 1100,
     margin: '0 auto',
     padding: '24px 16px',
-    color: '#FFFFFF',
-    backgroundColor: '#0A0A0A',
+    color: '#000000',
+    backgroundColor: '#FFFFFF',
     minHeight: '100vh',
   },
   nav: {
-    background: '#121212',
-    color: '#FFFFFF',
+    background: '#FFFFFF',
+    color: '#000000',
     padding: '14px 20px',
     borderRadius: 0,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     display: 'flex',
     alignItems: 'center',
     marginBottom: 20,
@@ -507,17 +507,17 @@ const style = {
   },
   spacer: { flex: 1 },
   badge: {
-    background: '#18181B',
-    color: '#FFFFFF',
+    background: '#F4F4F5',
+    color: '#000000',
     fontSize: 11,
     fontWeight: 700,
     padding: '3px 9px',
     borderRadius: 0,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     marginLeft: 6,
   },
   backLink: {
-    color: '#FFFFFF',
+    color: '#000000',
     textDecoration: 'none',
     fontSize: 13,
     fontWeight: 700,
@@ -527,17 +527,17 @@ const style = {
     padding: '6px 12px',
     borderRadius: 0,
     background: 'transparent',
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     transition: 'background 0.2s ease',
   },
   infoBanner: {
-    background: '#121212',
-    border: '1px solid #27272A',
+    background: '#FAFAFA',
+    border: '1px solid #E4E4E7',
     borderLeft: '4px solid #FF1818',
     padding: '14px 18px',
     borderRadius: 0,
     marginBottom: 20,
-    color: '#FFFFFF',
+    color: '#000000',
   },
   flash: {
     padding: '12px 16px',
@@ -547,16 +547,16 @@ const style = {
     fontWeight: 500,
   },
   flashOk: {
-    background: '#141414',
-    border: '1px solid #27272A',
+    background: '#FAFAFA',
+    border: '1px solid #E4E4E7',
     borderLeft: '4px solid #10B981',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   flashErr: {
-    background: '#141414',
-    border: '1px solid #27272A',
+    background: '#FAFAFA',
+    border: '1px solid #E4E4E7',
     borderLeft: '4px solid #FF1818',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   row: {
     display: 'grid',
@@ -565,18 +565,18 @@ const style = {
     marginBottom: 28,
   },
   card: {
-    background: '#121212',
+    background: '#FFFFFF',
     borderRadius: 0,
     padding: 24,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     boxShadow: 'none',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   cardIconBg: {
     width: 32,
     height: 32,
     borderRadius: 0,
-    background: '#18181B',
+    background: '#F4F4F5',
     color: '#FF1818',
     display: 'grid',
     placeItems: 'center',
@@ -584,30 +584,30 @@ const style = {
   label: {
     fontSize: 13,
     fontWeight: 700,
-    color: '#E4E4E7',
+    color: '#000000',
     display: 'block',
     marginBottom: 6,
   },
   input: {
     width: '100%',
     padding: '10px 12px',
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     borderRadius: 0,
     fontSize: 14,
     outline: 'none',
     boxSizing: 'border-box',
-    background: '#18181B',
-    color: '#FFFFFF',
+    background: '#FFFFFF',
+    color: '#000000',
     transition: 'border-color 0.15s ease',
   },
   fileInput: {
     width: '100%',
     padding: '8px 10px',
-    border: '1px dashed #3F3F46',
+    border: '1px dashed #D4D4D8',
     borderRadius: 0,
     fontSize: 13,
-    background: '#18181B',
-    color: '#FFFFFF',
+    background: '#FFFFFF',
+    color: '#000000',
     boxSizing: 'border-box',
     cursor: 'pointer',
   },
@@ -628,7 +628,7 @@ const style = {
     boxShadow: 'none',
   },
   muted: {
-    color: '#A1A1AA',
+    color: '#71717A',
     fontSize: 13,
     lineHeight: 1.5,
   },
@@ -640,27 +640,27 @@ const style = {
   },
   tipText: {
     fontSize: 12,
-    color: '#A1A1AA',
+    color: '#71717A',
     marginTop: 14,
     padding: '10px 12px',
-    background: '#18181B',
+    background: '#F4F4F5',
     borderRadius: 0,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     lineHeight: 1.5,
   },
   importStatusBox: {
-    background: '#18181B',
-    border: '1px solid #27272A',
+    background: '#FAFAFA',
+    border: '1px solid #E4E4E7',
     borderRadius: 0,
     padding: 14,
     marginTop: 6,
-    color: '#FFFFFF',
+    color: '#000000',
   },
   pulseIconBox: {
     width: 36,
     height: 36,
     borderRadius: 0,
-    background: '#27272A',
+    background: '#F4F4F5',
     color: '#FF1818',
     display: 'grid',
     placeItems: 'center',
@@ -668,7 +668,7 @@ const style = {
   progressTrack: {
     height: 6,
     width: '100%',
-    background: '#27272A',
+    background: '#E4E4E7',
     borderRadius: 0,
     overflow: 'hidden',
     margin: '12px 0 6px',
@@ -708,27 +708,27 @@ const style = {
   },
   searchInput: {
     padding: '8px 12px 8px 32px',
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     borderRadius: 0,
     fontSize: 13,
     outline: 'none',
     width: 240,
-    background: '#18181B',
-    color: '#FFFFFF',
+    background: '#FFFFFF',
+    color: '#000000',
   },
   btnLink: {
     background: 'transparent',
     border: 'none',
-    color: '#A1A1AA',
+    color: '#71717A',
     cursor: 'pointer',
     fontSize: 13,
     fontWeight: 600,
     padding: '4px 8px',
   },
   tableCard: {
-    background: '#121212',
+    background: '#FFFFFF',
     borderRadius: 0,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
     overflow: 'hidden',
     boxShadow: 'none',
   },
@@ -738,43 +738,43 @@ const style = {
     textAlign: 'left',
   },
   th: {
-    background: '#18181B',
+    background: '#F4F4F5',
     padding: '12px 16px',
     fontSize: 11,
     fontWeight: 700,
-    color: '#A1A1AA',
+    color: '#71717A',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    borderBottom: '1px solid #27272A',
+    borderBottom: '1px solid #E4E4E7',
   },
   tr: {
-    borderBottom: '1px solid #27272A',
+    borderBottom: '1px solid #E4E4E7',
   },
   td: {
     padding: '12px 16px',
     fontSize: 14,
-    color: '#FFFFFF',
+    color: '#000000',
     verticalAlign: 'middle',
   },
   codePill: {
     fontFamily: 'ui-monospace, monospace',
     fontSize: 13,
     fontWeight: 700,
-    background: '#18181B',
-    color: '#FFFFFF',
+    background: '#F4F4F5',
+    color: '#FF1818',
     padding: '3px 8px',
     borderRadius: 0,
-    border: '1px solid #27272A',
+    border: '1px solid #E4E4E7',
   },
   emptyTd: {
     padding: '40px 16px',
     textAlign: 'center',
-    color: '#A1A1AA',
+    color: '#71717A',
   },
   btnReset: {
     background: '#FFFFFF',
     color: '#000000',
-    border: '1px solid #FFFFFF',
+    border: '1px solid #E4E4E7',
     padding: '6px 10px',
     borderRadius: 0,
     cursor: 'pointer',
