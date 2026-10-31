@@ -4,6 +4,16 @@ import { API_BASE } from '../lib/supabase.js';
 import Loading from '../components/Loading.jsx';
 
 export default function ExamScreen() {
+  const studentUser = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('exam_student_user') || '{}');
+    } catch (_) {
+      return {};
+    }
+  })();
+  const studentRollNo = studentUser.username || '';
+  const studentName = studentUser.name || studentUser.username || 'Student';
+
   const [data, setData] = useState(null);
   const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(true);
@@ -359,8 +369,16 @@ export default function ExamScreen() {
   return (
     <div style={style.examRoot}>
       <header style={style.bar}>
-        <div>
-          <b id="examTitle" data-testid="examTitle">{data?.title || 'Exam'}</b> &middot; Student
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <b id="examTitle" data-testid="examTitle">{data?.title || 'Exam'}</b>
+          <span style={{ color: '#64748b' }}>&middot;</span>
+          <span id="studentRollNo" data-testid="studentRollNo" style={{ color: '#cbd5e1', fontSize: 13, fontWeight: 500 }}>
+            {studentRollNo ? `Roll No: ${studentRollNo}` : ''}
+          </span>
+          {studentRollNo && <span style={{ color: '#64748b' }}>&middot;</span>}
+          <span id="studentName" data-testid="studentName" style={{ color: '#f8fafc', fontSize: 13, fontWeight: 600 }}>
+            {studentName}
+          </span>
         </div>
         <div>
           <span id="viol" style={{ marginRight: 16 }}>
@@ -411,6 +429,31 @@ export default function ExamScreen() {
             </div>
           ) : readyToShowQuestion ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div
+                data-testid="studentExamBadge"
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  padding: '12px 18px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                  fontSize: 14,
+                }}
+              >
+                <div>
+                  <span style={{ color: '#64748b', marginRight: 6 }}>Student Name:</span>
+                  <strong style={{ color: '#0f172a' }}>{studentName}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', marginRight: 6 }}>Roll Number:</span>
+                  <strong style={{ color: '#0f172a' }}>{studentRollNo || '—'}</strong>
+                </div>
+              </div>
+
               {Array.isArray(data.questions) && data.questions.length > 0 ? (
                 data.questions.map((q, idx) => (
                   <div key={q.id || idx}>
