@@ -1,11 +1,22 @@
 const { Pool } = require('pg');
 const config = require('./config');
 
+const isSupabase = config.DATABASE_URL && (
+  config.DATABASE_URL.includes('supabase.com') ||
+  config.DATABASE_URL.includes('supabase.co') ||
+  config.DATABASE_URL.includes('pooler.supabase.com')
+);
+
 const pool = new Pool({
   connectionString: config.DATABASE_URL,
-  ssl: config.DATABASE_URL && config.DATABASE_URL.includes('supabase.co')
-    ? { rejectUnauthorized: false }
-    : false,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+  ssl: isSupabase ? { rejectUnauthorized: false } : false,
+});
+
+pool.on('error', (err) => {
+  console.error('[pg pool error] Unexpected idle client error:', err);
 });
 
 // Helper: run a query with params
