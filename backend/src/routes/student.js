@@ -62,16 +62,8 @@ router.post('/enter', verifyStudentJwtOrSession, async (req, res) => {
 
   const s = req.student;
   const code = String(exam_code).toUpperCase().trim();
-
-  // 1. Fast preliminary check: verify exam exists and is not ended
-  const examCheck = await query(
-    'SELECT id, title, code, status, duration_min, max_violations, questions_per_student FROM exams WHERE code = $1 AND status <> $2',
-    [code, 'ended']
-  );
-  if (examCheck.rows.length === 0) {
-    return res.status(400).json({ error: 'Invalid exam code, or the exam has ended' });
-  }
-  const exam = examCheck.rows[0];
+  const token = crypto.randomBytes(16).toString('hex');
+  const wantsStart = start_exam !== false;
 
   let attempt = 0;
   while (attempt < MAX_ENTER_RETRIES) {
@@ -79,149 +71,41 @@ router.post('/enter', verifyStudentJwtOrSession, async (req, res) => {
     let client;
     try {
       client = await pool.connect();
-      await client.query('BEGIN');
-
-      // 2. Transaction-scoped advisory lock on exam.id
-      // Serializes concurrent entries for the SAME exam (prevents login_order race & FK deadlock)
-      // Released automatically on COMMIT or ROLLBACK; different exams stay 100% parallel.
-      await client.query('SELECT pg_advisory_xact_lock($1)', [exam.id]);
-
-      // 3. Atomically insert or retrieve exam session, compute login_order, and set entered_at
-      const generatedToken = crypto.randomBytes(16).toString('hex');
-      const wantsStart = start_exam !== false;
-
-      const sessionRes = await client.query(
-        `INSERT INTO exam_sessions (exam_id, user_id, login_order, login_time, token, last_seen, entered_at)
-         VALUES (
-           $1,
-           $2,
-           (SELECT COALESCE(MAX(login_order), 0) + 1 FROM exam_sessions WHERE exam_id = $1),
-           now(),
-           $3,
-           now(),
-           CASE WHEN $4 = true THEN now() ELSE NULL END
-         )
-         ON CONFLICT (exam_id, user_id) DO UPDATE
-         SET token = COALESCE(exam_sessions.token, EXCLUDED.token),
-             last_seen = now(),
-             entered_at = CASE
-               WHEN exam_sessions.entered_at IS NOT NULL THEN exam_sessions.entered_at
-               WHEN $4 = true THEN now()
-               ELSE NULL
-             END
-         RETURNING id, token, login_order, q_id, assigned_q_ids, locked, violations, entered_at,
-                   EXTRACT(EPOCH FROM entered_at) as entered_at_epoch`,
-        [exam.id, s.userId, generatedToken, wantsStart]
+      const r = await client.query(
+        'SELECT * FROM fn_student_enter_exam($1, $2, $3, $4)',
+        [code, s.userId, token, wantsStart]
       );
 
-      const sessionRow = sessionRes.rows[0];
-      if (!sessionRow) {
-        throw new Error('Failed to retrieve or create exam session');
+      if (!r.rows || r.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid exam code, or the exam has ended' });
       }
 
-      const token = sessionRow.token || generatedToken;
-      const nowEpoch = Math.floor(Date.now() / 1000);
-      const enteredEpoch = sessionRow.entered_at_epoch ? parseInt(sessionRow.entered_at_epoch, 10) : null;
-      const elapsed = enteredEpoch != null ? nowEpoch - enteredEpoch : 0;
-      const shouldStart = wantsStart && enteredEpoch != null;
+      const row = r.rows[0];
+      const questions = Array.isArray(row.questions_json) ? row.questions_json : [];
+      let position = 0;
+      let questionText = null;
 
-      let qId = sessionRow.q_id ? parseInt(sessionRow.q_id, 10) : null;
-      let qNo = 0;
-      let assignedQuestionsList = [];
-      let notice = null;
-
-      const numQuestions = Math.max(1, parseInt(exam.questions_per_student, 10) || 1);
-      let hasAssigned = !!qId || (Array.isArray(sessionRow.assigned_q_ids) && sessionRow.assigned_q_ids.length > 0);
-
-      if (exam.status === 'live' && shouldStart && elapsed < exam.duration_min * 60) {
-        if (!hasAssigned) {
-          const qs = await client.query(
-            `SELECT q.id, q.q_no, q.body,
-                    COUNT(es.id) AS c
-             FROM questions q
-             LEFT JOIN exam_sessions es ON (es.q_id = q.id OR q.id = ANY(es.assigned_q_ids)) AND es.exam_id = $1
-             WHERE q.exam_id = $1
-             GROUP BY q.id, q.q_no, q.body
-             ORDER BY c ASC, RANDOM()`,
-            [exam.id]
-          );
-
-          if (qs.rows.length > 0) {
-            const countToPick = Math.min(numQuestions, qs.rows.length);
-            const picked = qs.rows.slice(0, countToPick);
-            picked.sort((a, b) => parseInt(a.q_no, 10) - parseInt(b.q_no, 10));
-
-            const pickIds = picked.map((q) => parseInt(q.id, 10));
-            const firstPick = pickIds[0];
-
-            await client.query(
-              'UPDATE exam_sessions SET q_id = $1, assigned_q_ids = $2 WHERE id = $3',
-              [firstPick, pickIds, sessionRow.id]
-            );
-
-            qId = firstPick;
-            qNo = parseInt(picked[0].q_no, 10);
-            assignedQuestionsList = picked.map((q) => ({
-              id: q.id,
-              position: parseInt(q.q_no, 10),
-              body: q.body,
-            }));
-            hasAssigned = true;
-          } else {
-            notice = 'No questions have been set for this exam. Please inform the faculty.';
-          }
-        } else {
-          hasAssigned = true;
-          const assignedIds = Array.isArray(sessionRow.assigned_q_ids) && sessionRow.assigned_q_ids.length > 0
-            ? sessionRow.assigned_q_ids
-            : [qId];
-
-          const qrows = await client.query(
-            'SELECT id, q_no, body FROM questions WHERE id = ANY($1) AND exam_id = $2 ORDER BY q_no ASC',
-            [assignedIds, exam.id]
-          );
-
-          if (qrows.rows.length > 0) {
-            qId = parseInt(qrows.rows[0].id, 10);
-            qNo = parseInt(qrows.rows[0].q_no, 10);
-            assignedQuestionsList = qrows.rows.map((q) => ({
-              id: q.id,
-              position: parseInt(q.q_no, 10),
-              body: q.body,
-            }));
-          }
-        }
-      }
-
-      await client.query('COMMIT');
-
-      let seconds_left = null;
-      if (exam.status === 'live') {
-        if (enteredEpoch == null) {
-          seconds_left = exam.duration_min * 60;
-        } else {
-          seconds_left = Math.max(0, exam.duration_min * 60 - elapsed);
-        }
+      if (questions.length > 0) {
+        position = parseInt(questions[0].position, 10);
+        questionText = questions.map((q) => `Question ${q.position}:\n${q.body}`).join('\n\n');
       }
 
       const out = {
-        status: exam.status === 'live' && enteredEpoch != null && elapsed >= exam.duration_min * 60 ? 'ended' : exam.status,
-        title: exam.title,
-        locked: !!sessionRow.locked,
-        violations: parseInt(sessionRow.violations || 0, 10),
-        max: parseInt(exam.max_violations, 10),
-        seconds_left,
-        entered: (hasAssigned || Boolean(notice)) && enteredEpoch != null,
-        session_token: token,
+        status: row.status,
+        title: row.title,
+        locked: !!row.locked,
+        violations: parseInt(row.violations || 0, 10),
+        max: parseInt(row.max_violations, 10),
+        seconds_left: row.seconds_left,
+        entered: !!row.entered,
+        session_token: row.token,
       };
-      if (qId || assignedQuestionsList.length > 0) {
-        out.position = qNo;
-        if (assignedQuestionsList.length > 0) {
-          out.questions = assignedQuestionsList;
-          out.question = assignedQuestionsList.map((q) => `Question ${q.position}:\n${q.body}`).join('\n\n');
-        }
+
+      if (position > 0 || questions.length > 0) {
+        out.position = position;
+        out.questions = questions;
+        out.question = questionText;
       }
-      if (notice) out.notice = notice;
 
       const durationMs = Date.now() - startTime;
       if (durationMs > 1000) {
@@ -230,10 +114,10 @@ router.post('/enter', verifyStudentJwtOrSession, async (req, res) => {
 
       return res.json(out);
     } catch (err) {
-      if (client) {
-        try { await client.query('ROLLBACK'); } catch (_) {}
-      }
       const pgCode = err.code;
+      if (err.message && err.message.includes('INVALID_EXAM')) {
+        return res.status(400).json({ error: 'Invalid exam code, or the exam has ended' });
+      }
       if (RETRY_CODES.has(pgCode) && attempt < MAX_ENTER_RETRIES) {
         const backoffMs = 50 + Math.floor(Math.random() * 100);
         console.warn(`[RETRY POST /enter] code=${code} pgError=${pgCode} attempt=${attempt}/${MAX_ENTER_RETRIES} backoff=${backoffMs}ms`);
