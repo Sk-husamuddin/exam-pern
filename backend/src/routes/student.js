@@ -355,6 +355,7 @@ router.post('/leave', verifyStudentSession, async (req, res) => {
 // ------------------------------------------------------------------
 // Record violation (tab switch, blur, fullscreen exit, blocked key)
 // Uses the exam session token returned by /enter.
+// Single atomic UPDATE: increments violations, locks if threshold reached.
 // ------------------------------------------------------------------
 router.post('/violation', verifyStudentSession, async (req, res) => {
   try {
@@ -363,62 +364,55 @@ router.post('/violation', verifyStudentSession, async (req, res) => {
 
     const nowEpoch = Math.floor(Date.now() / 1000);
     const enteredEpoch = s.entered_at_epoch ? parseInt(s.entered_at_epoch, 10) : null;
-
     const hasAssigned = !!s.q_id || (Array.isArray(s.assigned_q_ids) && s.assigned_q_ids.length > 0);
+    const maxViolations = parseInt(s.max_violations, 10) || 3;
+    const markPast = reason.includes('fullscreen') || reason.includes('Tab') || reason.includes('focus');
+
+    let curViolations = parseInt(s.violations, 10) || 0;
+    let curLocked = !!s.locked;
+
     if (s.status === 'live' && !s.locked && hasAssigned && enteredEpoch != null && nowEpoch - enteredEpoch < s.duration_min * 60) {
-      await query('BEGIN');
-      try {
-        const latest = await query(
-          'SELECT violations, locked FROM exam_sessions WHERE id = $1 FOR UPDATE',
-          [s.id]
+      const updRes = await query(
+        `UPDATE exam_sessions
+         SET violations = violations + 1,
+             locked = CASE WHEN violations + 1 >= $2 THEN true ELSE locked END,
+             last_seen = CASE WHEN violations + 1 >= $2 OR $3 = true THEN now() - interval '1 minute' ELSE last_seen END
+         WHERE id = $1
+         RETURNING violations, locked`,
+        [s.id, maxViolations, markPast]
+      );
+
+      if (updRes.rows.length > 0) {
+        curViolations = parseInt(updRes.rows[0].violations, 10);
+        curLocked = !!updRes.rows[0].locked;
+        // Non-blocking violation log insertion
+        query('INSERT INTO violation_log (session_id, reason) VALUES ($1, $2)', [s.id, reason]).catch((e) =>
+          console.warn('violation_log insert warning:', e.message)
         );
-        const cur = latest.rows[0];
-        const newViolations = parseInt(cur.violations, 10) + 1;
-        const newLocked = newViolations >= parseInt(s.max_violations, 10) ? 1 : cur.locked;
-
-        await query(
-          'UPDATE exam_sessions SET violations = $1, locked = $2 WHERE id = $3',
-          [newViolations, newLocked, s.id]
-        );
-        await query('INSERT INTO violation_log (session_id, reason) VALUES ($1, $2)', [s.id, reason]);
-
-        // If the student left fullscreen, switched tabs, blurred, or got locked, immediately mark last_seen in the past
-        if (newLocked === 1 || reason.includes('fullscreen') || reason.includes('Tab') || reason.includes('focus')) {
-          await query("UPDATE exam_sessions SET last_seen = now() - interval '1 minute' WHERE id = $1", [s.id]);
-        }
-
-        await query('COMMIT');
-      } catch (err) {
-        await query('ROLLBACK');
-        throw err;
       }
     }
 
-    // Return updated state
-    const updated = await query(
-      `SELECT s.locked, s.violations,
-              e.status, e.title, e.duration_min, e.max_violations,
-              EXTRACT(EPOCH FROM (e.started_at AT TIME ZONE 'UTC')) as started_at_epoch
-       FROM exam_sessions s JOIN exams e ON e.id = s.exam_id
-       WHERE s.id = $1`,
-      [s.id]
-    );
-    const us = updated.rows[0];
-    let ustatus = us.status;
-    const nowE = Math.floor(Date.now() / 1000);
-    const startE = us.started_at_epoch ? parseInt(us.started_at_epoch, 10) : null;
-    if (ustatus === 'live' && startE != null && nowE - startE >= us.duration_min * 60) {
-      await query('UPDATE exams SET status = $1 WHERE id = $2 AND status = $3', ['ended', s.exam_id, 'live']);
-      ustatus = 'ended';
+    let status = s.status;
+    let seconds_left = null;
+    if (status === 'live') {
+      if (enteredEpoch != null) {
+        const elapsed = nowEpoch - enteredEpoch;
+        seconds_left = Math.max(0, s.duration_min * 60 - elapsed);
+        if (elapsed >= s.duration_min * 60) {
+          status = 'ended';
+        }
+      } else {
+        seconds_left = s.duration_min * 60;
+      }
     }
 
-    res.json({
-      status: ustatus,
-      title: us.title,
-      locked: !!us.locked,
-      violations: parseInt(us.violations, 10),
-      max: parseInt(us.max_violations, 10),
-      seconds_left: ustatus === 'live' ? Math.max(0, us.duration_min * 60 - (nowE - startE)) : null,
+    return res.json({
+      status,
+      title: s.title,
+      locked: curLocked,
+      violations: curViolations,
+      max: maxViolations,
+      seconds_left,
     });
   } catch (err) {
     console.error('POST /violation error:', err);

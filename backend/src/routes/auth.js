@@ -96,16 +96,10 @@ router.post('/student/login', async (req, res) => {
       { expiresIn: '12h' }
     );
 
-    // Kick-out: rotate token for all existing exam sessions so the old
+    // Kick-out: rotate token for all existing exam sessions atomically so old
     // browser is invalidated (same as PHP login.php behavior).
-    const token = require('crypto').randomBytes(16).toString('hex');
-    const sessions = await query(
-      'SELECT id FROM exam_sessions WHERE user_id = $1',
-      [user.id]
-    );
-    for (const s of sessions.rows) {
-      await query('UPDATE exam_sessions SET token = $1, last_seen = now() WHERE id = $2', [token, s.id]);
-    }
+    const token = crypto.randomBytes(16).toString('hex');
+    await query('UPDATE exam_sessions SET token = $1, last_seen = now() WHERE user_id = $2', [token, user.id]);
 
     res.json({
       ok: true,
