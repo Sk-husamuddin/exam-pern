@@ -220,11 +220,11 @@ export default function StudentsManager() {
 
           {/* Info Banner */}
           <div style={style.infoBanner}>
-            <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: 2 }}>
+            <div style={{ fontWeight: 700, color: '#FFFFFF', marginBottom: 2 }}>
               Default Student Credentials
             </div>
-            <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.5 }}>
-              Every student&apos;s <b>password is identical to their username</b> (roll number). Students log in with their roll number, that password, and the exam code.
+            <div style={{ color: '#A1A1AA', fontSize: 13, lineHeight: 1.5 }}>
+              Every student&apos;s <b style={{ color: '#FFFFFF' }}>password is identical to their username</b> (roll number). Students log in with their roll number, that password, and the exam code.
             </div>
           </div>
 
@@ -234,9 +234,9 @@ export default function StudentsManager() {
             <div style={style.card}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <div style={style.cardIconBg}>
-                  <UserPlus size={18} color="#4f46e5" />
+                  <UserPlus size={18} color="#FF1818" />
                 </div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#FFFFFF' }}>
                   1. Create manually
                 </h3>
               </div>
@@ -300,14 +300,14 @@ export default function StudentsManager() {
             <div style={style.card}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <div style={style.cardIconBg}>
-                  <FileSpreadsheet size={18} color="#4f46e5" />
+                  <FileSpreadsheet size={18} color="#FF1818" />
                 </div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#FFFFFF' }}>
                   2. Import from Excel / CSV
                 </h3>
               </div>
               <p style={{ ...style.muted, marginBottom: 12 }}>
-                File (.xlsx or .csv): <b>Column A = roll number</b>, <b>Column B = full name</b>.{' '}
+                File (.xlsx or .csv): <b style={{ color: '#FFFFFF' }}>Column A = roll number</b>, <b style={{ color: '#FFFFFF' }}>Column B = full name</b>.{' '}
                 <a
                   href="data:text/csv;charset=utf-8,username%2Cname%0A21CS001%2CRavi%20Kumar%0A21CS002%2CPriya%20Sharma"
                   download="sample_students.csv"
@@ -341,13 +341,13 @@ export default function StudentsManager() {
                   <div style={style.importStatusBox} role="status" aria-live="polite">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={style.pulseIconBox}>
-                        <FileSpreadsheet size={22} color="#4f46e5" className="spin" />
+                        <FileSpreadsheet size={22} color="#FF1818" className="spin" />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF' }}>
                           Uploading & Processing Roster…
                         </div>
-                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: '#A1A1AA', marginTop: 2 }}>
                           Reading rows, hashing student passwords, and creating database profiles.
                         </div>
                       </div>
@@ -356,7 +356,7 @@ export default function StudentsManager() {
                     <div className="progress-track" style={style.progressTrack}>
                       <div className="progress-value" style={style.progressValue} />
                     </div>
-                    <div style={{ fontSize: 11, color: '#6366f1', fontWeight: 600, textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, color: '#FF1818', fontWeight: 600, textAlign: 'right' }}>
                       Please wait, do not close this window…
                     </div>
                   </div>
@@ -395,7 +395,7 @@ export default function StudentsManager() {
           <div style={style.tableSection}>
             <div style={style.tableHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#FFFFFF' }}>
                   Enrolled Students ({total})
                 </h3>
               </div>
@@ -447,7 +447,7 @@ export default function StudentsManager() {
                           <span style={style.codePill}>{s && s.username}</span>
                         </td>
                         <td style={style.td}>
-                          <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                          <span style={{ fontWeight: 600, color: '#FFFFFF' }}>
                             {s && (s.name || s.username)}
                           </span>
                         </td>

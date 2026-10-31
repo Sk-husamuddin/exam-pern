@@ -404,9 +404,9 @@ export default function ExamScreen() {
         <main id="main" style={style.main}>
           {data.locked ? (
             <div style={style.card}>
-              <h2 style={{ color: '#b91c1c', marginTop: 0 }}>Exam locked</h2>
-              <p style={{ fontSize: 16, lineHeight: 1.6, color: '#374151' }}>
-                Your exam was locked because of too many violations (<b>{data.violations}/{data.max || 3}</b>). Please contact the faculty to unlock your exam.
+              <h2 style={{ color: '#FF1818', marginTop: 0, fontWeight: 800 }}>Exam locked</h2>
+              <p style={{ fontSize: 16, lineHeight: 1.6, color: '#FFFFFF' }}>
+                Your exam was locked because of too many violations (<b style={{ color: '#FF1818' }}>{data.violations}/{data.max || 3}</b>). Please contact the faculty to unlock your exam.
               </p>
               <Link to="/student/dashboard" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
                 Back to dashboard
@@ -414,16 +414,16 @@ export default function ExamScreen() {
             </div>
           ) : data.status === 'ended' ? (
             <div style={style.card}>
-              <h2 style={{ marginTop: 0 }}>Exam ended</h2>
-              <p style={{ fontSize: 16, color: '#374151' }}>Thank you. Your exam has ended.</p>
+              <h2 style={{ marginTop: 0, color: '#FFFFFF', fontWeight: 800 }}>Exam ended</h2>
+              <p style={{ fontSize: 16, color: '#E4E4E7' }}>Thank you. Your exam has ended.</p>
               <Link to="/student/dashboard" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
                 Back to dashboard
               </Link>
             </div>
           ) : data.status === 'kicked' ? (
             <div style={style.card}>
-              <h2 style={{ marginTop: 0 }}>Session expired</h2>
-              <p style={{ fontSize: 16, color: '#374151' }}>This student session is no longer active. Please sign in again.</p>
+              <h2 style={{ marginTop: 0, color: '#FFFFFF', fontWeight: 800 }}>Session expired</h2>
+              <p style={{ fontSize: 16, color: '#E4E4E7' }}>This student session is no longer active. Please sign in again.</p>
               <Link to="/" onClick={sendLeaveSignal} style={style.btnPrimaryLink}>
                 Login
               </Link>
@@ -458,10 +458,10 @@ export default function ExamScreen() {
               {Array.isArray(data.questions) && data.questions.length > 0 ? (
                 data.questions.map((q, idx) => (
                   <div key={q.id || idx}>
-                    <h2 style={{ marginBottom: 12, color: '#1e293b', fontSize: 20 }}>
+                    <h2 style={{ marginBottom: 12, color: '#FFFFFF', fontSize: 20, fontWeight: 800 }}>
                       Question {q.position != null ? q.position : idx + 1}
                       {data.questions.length > 1 && (
-                        <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b', marginLeft: 10 }}>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: '#A1A1AA', marginLeft: 10 }}>
                           ({idx + 1} of {data.questions.length})
                         </span>
                       )}
@@ -473,7 +473,7 @@ export default function ExamScreen() {
                 ))
               ) : (
                 <div>
-                  <h2 style={{ marginBottom: 16 }}>Question {data.position || ''}</h2>
+                  <h2 style={{ marginBottom: 16, color: '#FFFFFF', fontSize: 20, fontWeight: 800 }}>Question {data.position || ''}</h2>
                   <div style={style.question}>
                     {data.question || 'No question has been assigned yet. Please contact faculty.'}
                   </div>
@@ -482,7 +482,7 @@ export default function ExamScreen() {
             </div>
           ) : (
             <div style={style.card}>
-              <p style={{ color: '#4b5563', margin: 0, fontSize: 15 }}>
+              <p style={{ color: '#A1A1AA', margin: 0, fontSize: 15 }}>
                 Waiting for the faculty to start the exam…
               </p>
             </div>
@@ -495,7 +495,7 @@ export default function ExamScreen() {
       {showOverlay && (
         <div id="fsOverlay" className="overlay" style={style.overlay}>
           <div style={style.overlayCard}>
-            <h2 style={{ marginTop: 0 }}>Return to fullscreen to continue</h2>
+            <h2 style={{ marginTop: 0, color: '#FFFFFF', fontWeight: 800 }}>Return to fullscreen to continue</h2>
             <p style={{ fontSize: 14, lineHeight: 1.5, color: '#e5e7eb' }}>
               The exam is live and your question is ready. Click below to enter fullscreen.
               Switching tabs or leaving fullscreen is recorded as a violation.
@@ -515,7 +515,7 @@ export default function ExamScreen() {
 
       <style>{`
         .exam { user-select: none; -webkit-user-select: none }
-        body.exam, #root.exam { background: #f4f6f9; }
+        body.exam, #root.exam { background: #0A0A0A; }
       `}</style>
     </div>
   );

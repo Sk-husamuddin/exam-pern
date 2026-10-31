@@ -217,11 +217,11 @@ export default function StudentDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
               <div>
                 <span style={style.eyebrow}>ASSESSMENT PORTAL</span>
-                <h2 style={{ margin: '4px 0 6px', fontSize: 24, color: '#0f172a' }}>
+                <h2 style={{ margin: '4px 0 6px', fontSize: 24, color: '#FFFFFF', fontWeight: 800 }}>
                   {state?.title || sessionStorage.getItem('exam_student_title') || 'Assigned Exam'}
                 </h2>
-                <div style={{ fontSize: 13, color: '#64748b' }}>
-                  Student: <b>{studentName}</b>
+                <div style={{ fontSize: 13, color: '#A1A1AA' }}>
+                  Student: <b style={{ color: '#FFFFFF' }}>{studentName}</b>
                   {studentUser.username && studentUser.username !== studentName && (
                     <span> ({studentUser.username})</span>
                   )}
@@ -229,7 +229,7 @@ export default function StudentDashboard() {
               </div>
               {examCode && (
                 <div style={style.codeBox}>
-                  <small style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.05em' }}>Exam Code</small>
+                  <small style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', color: '#A1A1AA', fontWeight: 700, letterSpacing: '0.05em' }}>Exam Code</small>
                   <span style={style.codeText}>{examCode}</span>
                 </div>
               )}
@@ -246,8 +246,8 @@ export default function StudentDashboard() {
                   </div>
                   <div style={style.stat}>
                     <small style={style.statLabel}>Time Remaining</small>
-                    <b id="timeLeft" style={{ fontSize: 18, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Clock size={16} color="#6366f1" />
+                    <b id="timeLeft" style={{ fontSize: 18, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Clock size={16} color="#FF1818" />
                       {fmt(state.seconds_left)}
                     </b>
                   </div>
@@ -269,18 +269,18 @@ export default function StudentDashboard() {
                       </span>
                     </div>
                   ) : state.status === 'ended' ? (
-                    <span style={{ color: '#475569' }}>This exam has officially ended. Thank you for your submission.</span>
+                    <span style={{ color: '#A1A1AA' }}>This exam has officially ended. Thank you for your submission.</span>
                   ) : state.locked ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <ShieldAlert size={18} color="#b91c1c" />
-                      <span style={{ color: '#b91c1c', fontWeight: 600 }}>
+                      <ShieldAlert size={18} color="#FF1818" />
+                      <span style={{ color: '#FF1818', fontWeight: 600 }}>
                         Your exam session is locked due to violations ({state.violations}/{state.max || 3}). Please contact your faculty invigilator to unlock it.
                       </span>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Clock size={18} color="#d97706" />
-                      <span style={{ color: '#b45309' }}>
+                      <Clock size={18} color="#FDB813" />
+                      <span style={{ color: '#FDB813' }}>
                         Waiting for faculty to start the exam. Please remain on this screen; the red <b>Start Exam</b> button will activate automatically.
                       </span>
                     </div>
@@ -314,24 +314,24 @@ export default function StudentDashboard() {
                 </div>
               </>
             )}
-            {!state && <p style={{ color: '#64748b' }}>Loading exam details…</p>}
+            {!state && <p style={{ color: '#A1A1AA' }}>Loading exam details…</p>}
           </div>
 
           {/* Exam Security Instructions Card */}
           <div style={style.card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <ShieldAlert size={18} color="#4f46e5" />
-              <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>Exam Rules & Security Guidelines</h3>
+              <ShieldAlert size={18} color="#FF1818" />
+              <h3 style={{ margin: 0, fontSize: 16, color: '#FFFFFF', fontWeight: 800 }}>Exam Rules & Security Guidelines</h3>
             </div>
             <ul style={style.rules}>
               <li>
-                Clicking <b>&quot;Start Exam&quot;</b> will immediately switch your screen into <b>fullscreen mode</b> and load your assigned questions.
+                Clicking <b style={{ color: '#FFFFFF' }}>&quot;Start Exam&quot;</b> will immediately switch your screen into <b style={{ color: '#FFFFFF' }}>fullscreen mode</b> and load your assigned questions.
               </li>
               <li>
-                <b>Do not leave fullscreen or switch tabs:</b> Exiting fullscreen, minimizing the window, or switching browser tabs is recorded as a security violation.
+                <b style={{ color: '#FFFFFF' }}>Do not leave fullscreen or switch tabs:</b> Exiting fullscreen, minimizing the window, or switching browser tabs is recorded as a security violation.
               </li>
               <li>
-                <b>Automatic Lockout:</b> Reaching <b>{state && state.max != null ? state.max : 3}</b> violations will lock your test and require faculty intervention.
+                <b style={{ color: '#FFFFFF' }}>Automatic Lockout:</b> Reaching <b style={{ color: '#FFFFFF' }}>{state && state.max != null ? state.max : 3}</b> violations will lock your test and require faculty intervention.
               </li>
               <li>
                 Keyboard shortcuts (copy, cut, paste, devtools, print screen) and right-click context menus are strictly disabled during the exam.

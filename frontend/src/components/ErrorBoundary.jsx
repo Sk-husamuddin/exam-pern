@@ -49,24 +49,24 @@ export class ErrorBoundary extends React.Component {
           role: 'alert',
           'aria-live': 'polite',
           style: {
-            fontFamily: 'system-ui, sans-serif',
+            fontFamily: 'Inter, system-ui, sans-serif',
             maxWidth: 560,
             margin: '8vh auto',
             padding: 24,
-            border: '1px solid #e5e7eb',
-            borderRadius: 10,
-            background: '#fff',
-            color: '#17213b',
+            border: '1px solid #27272A',
+            borderRadius: 0,
+            background: '#121212',
+            color: '#FFFFFF',
           },
         },
         React.createElement(
           'h2',
-          { style: { marginTop: 0, fontSize: 20, color: '#b91c1c' } },
+          { style: { marginTop: 0, fontSize: 20, color: '#FF1818', fontWeight: 800 } },
           'Something went wrong'
         ),
         React.createElement(
           'p',
-          { style: { fontSize: 14, color: '#374151', marginBottom: 18 } },
+          { style: { fontSize: 14, color: '#E4E4E7', marginBottom: 18 } },
           message
         ),
         process.env.NODE_ENV === 'development' && errorInfo
@@ -95,13 +95,14 @@ export class ErrorBoundary extends React.Component {
             {
               onClick: this.handleReload,
               style: {
-                background: '#2b5cff',
-                color: '#fff',
-                border: 'none',
+                background: '#FF1818',
+                color: '#FFFFFF',
+                border: '1px solid #FF1818',
                 padding: '9px 16px',
-                borderRadius: 6,
+                borderRadius: 0,
                 cursor: 'pointer',
                 fontSize: 14,
+                fontWeight: 700,
               },
             },
             'Reload'
@@ -111,13 +112,14 @@ export class ErrorBoundary extends React.Component {
             {
               onClick: this.handleBackToLogin,
               style: {
-                background: 'transparent',
-                border: '1px solid #c6ccd8',
-                color: '#111',
+                background: '#FFFFFF',
+                border: '1px solid #FFFFFF',
+                color: '#000000',
                 padding: '9px 16px',
-                borderRadius: 6,
+                borderRadius: 0,
                 cursor: 'pointer',
                 fontSize: 14,
+                fontWeight: 700,
               },
             },
             'Back to login'
