@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
+import hourglassSrc from '../../assets/hourglass.png';
 
 /**
- * AsciiCanvas — Recreates the "nnnnn" ASCII-art / dither effect from 21st.dev
- * (https://21st.dev/community/ascii) using high-performance Canvas2D.
+ * AsciiCanvas — Recreates the "nnnnn" ASCII-art / dither hourglass effect from 21st.dev
+ * (https://21st.dev/community/ascii?preview=%2Fcommunity%2Fascii%2Fnnnnn-6c21b46c-9b8f-4f27-ad7c-6492021cc00f)
+ * using Canvas2D.
  *
- * Parameters supported from 21st.dev recipe:
- * - renderMode: "dither" | "characters" | "dots" | "matrix"
- * - cellSize: 16
+ * Parameters from 21st.dev recipe:
+ * - renderMode: "dither" | "characters"
+ * - cellSize: 16 (or 12 for crispness)
  * - brightness: 12, contrast: 115
  * - animStyle: "wave", animSpeed: 100, animIntensity: 60
  * - pfx: vignette (intensity 38), bloom (intensity 25)
@@ -20,22 +22,16 @@ const BAYER_4X4 = [
   [15 / 16, 7 / 16, 13 / 16, 5 / 16],
 ];
 
-// ASCII glyph palette ordered by perceived luminance
-const CHAR_SETS = {
-  standard: [' ', '·', ':', '!', '+', 'x', '*', '#', '%', '@'],
-  nnnnn: [' ', '.', ':', '-', '=', 'n', 'N', 'M', '█'],
-  matrix: [' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-};
+const NNNNN_CHARS = [' ', '·', ':', 'n', 'N', 'M', '█'];
 
 export default function AsciiCanvas({
-  initialMode = 'dither',
-  cellSize = 16,
+  cellSize = 14,
   className = '',
   style = {},
 }) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
-  const [renderMode, setRenderMode] = useState(initialMode);
+  const [renderMode, setRenderMode] = useState('dither'); // 'dither' | 'characters'
   const mouseRef = useRef({ x: -1000, y: -1000, active: false });
 
   useEffect(() => {
@@ -51,7 +47,16 @@ export default function AsciiCanvas({
     let height = 0;
     let dpr = 1;
 
-    // Offscreen buffer for rasterizing procedural 3D geometric subject
+    // Load Hourglass source artwork
+    const img = new Image();
+    let imgLoaded = false;
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      imgLoaded = true;
+    };
+    img.src = hourglassSrc;
+
+    // Offscreen buffer for sampling the source artwork
     const offscreen = document.createElement('canvas');
     const offCtx = offscreen.getContext ? offscreen.getContext('2d', { willReadFrequently: true }) : null;
 
@@ -66,19 +71,12 @@ export default function AsciiCanvas({
       canvas.height = Math.floor(height * dpr);
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
-
-      // Match offscreen grid size
-      const cols = Math.ceil(width / cellSize);
-      const rows = Math.ceil(height / cellSize);
-      offscreen.width = cols;
-      offscreen.height = rows;
     }
 
     const ro = new ResizeObserver(handleResize);
     ro.observe(container);
     handleResize();
 
-    // Track mouse interaction
     const onMouseMove = (e) => {
       const rect = canvas.getBoundingClientRect();
       mouseRef.current = {
@@ -95,8 +93,7 @@ export default function AsciiCanvas({
     container.addEventListener('mousemove', onMouseMove);
     container.addEventListener('mouseleave', onMouseLeave);
 
-    // Animation variables
-    let startTime = performance.now();
+    const startTime = performance.now();
 
     function render(currentTime) {
       if (width === 0 || height === 0 || !ctx || !offCtx) {
@@ -105,8 +102,7 @@ export default function AsciiCanvas({
       }
 
       const elapsed = (currentTime - startTime) * 0.001; // seconds
-      const speed = 1.0; // animSpeed = 100
-      const t = elapsed * speed;
+      const t = elapsed;
 
       const cols = Math.ceil(width / cellSize);
       const rows = Math.ceil(height / cellSize);
@@ -117,209 +113,178 @@ export default function AsciiCanvas({
       }
 
       // -------------------------------------------------------------
-      // 1. Draw dynamic 3D geometric subject on low-res offscreen buffer
+      // 1. Render Hourglass into low-res sampling buffer
       // -------------------------------------------------------------
-      offCtx.fillStyle = '#050505';
+      offCtx.fillStyle = '#FFFFFF';
       offCtx.fillRect(0, 0, cols, rows);
 
-      const cx = cols / 2;
-      const cy = rows / 2;
-      const maxDim = Math.min(cols, rows);
+      if (imgLoaded && img.naturalWidth > 0) {
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const gridAspect = cols / rows;
 
-      // Rotating torus-knot / multi-ring 3D shape
-      const rotX = t * 0.65;
-      const rotY = t * 0.95;
-      const rotZ = t * 0.35;
+        let drawW, drawH, drawX, drawY;
+        // Keep hourglass nicely framed in center
+        if (gridAspect > imgAspect) {
+          drawH = rows * 0.86;
+          drawW = drawH * imgAspect;
+          drawX = (cols - drawW) / 2;
+          drawY = (rows - drawH) / 2;
+        } else {
+          drawW = cols * 0.86;
+          drawH = drawW / imgAspect;
+          drawX = (cols - drawW) / 2;
+          drawY = (rows - drawH) / 2;
+        }
 
-      const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
-      const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
-      const cosZ = Math.cos(rotZ), sinZ = Math.sin(rotZ);
-
-      const numPoints = 220;
-      const pRadius = maxDim * 0.32;
-      const tubeRadius = maxDim * 0.14;
-
-      offCtx.lineWidth = 1.2;
-
-      // Draw procedural illuminated wireframe / ribbons
-      for (let i = 0; i < numPoints; i++) {
-        const u = (i / numPoints) * Math.PI * 4;
-        const v = (i / numPoints) * Math.PI * 8;
-
-        // Torus knot formula p=2, q=3
-        const r = pRadius * (0.8 + 0.3 * Math.sin(v + t));
-        const px0 = r * Math.cos(u);
-        const py0 = r * Math.sin(u);
-        const pz0 = tubeRadius * Math.sin(3 * u);
-
-        // Rotate 3D point
-        const y1 = py0 * cosX - pz0 * sinX;
-        const z1 = py0 * sinX + pz0 * cosX;
-
-        const x2 = px0 * cosY + z1 * sinY;
-        const z2 = -px0 * sinY + z1 * cosY;
-
-        const x3 = x2 * cosZ - y1 * sinZ;
-        const y3 = x2 * sinZ + y1 * cosZ;
-
-        const persp = 300 / (300 + z2);
-        const screenX = cx + x3 * persp;
-        const screenY = cy + y3 * persp;
-
-        // Depth-based brightness
-        const normZ = (z2 + tubeRadius * 2) / (tubeRadius * 4);
-        const b = Math.max(0.1, Math.min(1.0, normZ * 1.1));
-        const val = Math.floor(b * 255);
-
-        offCtx.fillStyle = `rgb(${val},${val},${val})`;
-        offCtx.fillRect(Math.floor(screenX), Math.floor(screenY), 2, 2);
+        offCtx.drawImage(img, drawX, drawY, drawW, drawH);
       }
 
-      // Read back sampled luminance
       const imgData = offCtx.getImageData(0, 0, cols, rows);
       const pixels = imgData.data;
 
       // -------------------------------------------------------------
-      // 2. Render to main canvas with devicePixelRatio scaling
+      // 2. Draw to main canvas with devicePixelRatio scaling
       // -------------------------------------------------------------
       ctx.save();
       ctx.scale(dpr, dpr);
 
-      // Background mode: "solid" white (#FFFFFF)
+      // Background mode: solid white (#FFFFFF)
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, width, height);
 
       const mouse = mouseRef.current;
-      const charList = CHAR_SETS[renderMode === 'characters' ? 'nnnnn' : 'standard'];
-      const charCount = charList.length;
+      const centerX = width / 2;
+      const centerY = height / 2;
 
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'center';
       ctx.font = `bold ${Math.floor(cellSize * 0.85)}px "Courier New", Courier, monospace`;
 
-      // Loop through cells
+      // Loop through grid cells
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const idx = (r * cols + c) * 4;
-          let lum = (pixels[idx] * 0.299 + pixels[idx + 1] * 0.587 + pixels[idx + 2] * 0.114) / 255;
+          const pr = pixels[idx];
+          const pg = pixels[idx + 1];
+          const pb = pixels[idx + 2];
+
+          // Normalized color
+          const isSand = pr > 150 && pg < 135 && pb < 90; // Orange/amber sand
+          const isBrightSand = pr > 210 && pg > 100 && pb < 80;
+
+          // Perceived inverted luminance (0 = white/light, 1 = dark black)
+          let darkness = 1.0 - (pr * 0.299 + pg * 0.587 + pb * 0.114) / 255;
 
           // Wave Animation: animStyle="wave", animSpeed=100, animIntensity=60
-          const wave = Math.sin(c * 0.14 + r * 0.12 - t * 2.2) * 0.28 +
-                       Math.cos(c * 0.08 - r * 0.16 + t * 1.5) * 0.18;
-          lum += wave * 0.6; // 60% intensity
+          // Creates the concentric & diagonal wave dither ripples as in 21st.dev preview
+          const cellX = c * cellSize;
+          const cellY = r * cellSize;
+          const distToCenter = Math.sqrt((cellX - centerX) ** 2 + (cellY - centerY) ** 2);
 
-          // Interactive mouse wave ripple
+          const diagWave = Math.sin((c * 0.18 + r * 0.18) - t * 2.2) * 0.16;
+          const rippleWave = Math.sin(distToCenter * 0.04 - t * 2.6) * 0.14;
+          const wave = (diagWave + rippleWave) * 0.6; // 60% animIntensity
+
+          // Modulate background darkness with wave
+          if (darkness < 0.45) {
+            darkness = Math.max(0, darkness + wave);
+          } else {
+            darkness = Math.min(1.0, darkness + wave * 0.3);
+          }
+
+          // Interactive mouse wave
           if (mouse.active) {
-            const cellCenterX = c * cellSize + cellSize / 2;
-            const cellCenterY = r * cellSize + cellSize / 2;
-            const dx = cellCenterX - mouse.x;
-            const dy = cellCenterY - mouse.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 260) {
-              const mouseWave = Math.sin(dist * 0.06 - t * 5.0) * Math.exp(-dist / 140);
-              lum += mouseWave * 0.45;
+            const dx = cellX + cellSize / 2 - mouse.x;
+            const dy = cellY + cellSize / 2 - mouse.y;
+            const mouseDist = Math.sqrt(dx * dx + dy * dy);
+            if (mouseDist < 220) {
+              const mouseWave = Math.sin(mouseDist * 0.08 - t * 6.0) * Math.exp(-mouseDist / 110);
+              darkness = Math.max(0, Math.min(1.0, darkness + mouseWave * 0.35));
             }
           }
 
           // Parameter adjustments:
           // brightness: +12%
-          lum += 0.12;
+          darkness = Math.max(0, darkness - 0.12 * (1.0 - darkness));
           // contrast: 115%
-          lum = (lum - 0.5) * 1.15 + 0.5;
-          // Clamp to [0, 1]
-          lum = Math.max(0, Math.min(1, lum));
+          darkness = (darkness - 0.5) * 1.15 + 0.5;
+          darkness = Math.max(0, Math.min(1.0, darkness));
 
-          const cellX = c * cellSize;
-          const cellY = r * cellSize;
+          if (darkness < 0.04) continue; // Skip near-white cells
 
-          // Determine color: Deep black (#09090b) or Swiss Red (#FF1818) on wave crests
-          const isAccent = lum > 0.82 && ((c + r) % 5 === 0);
-          const cellColor = isAccent ? '#FF1818' : '#09090B';
+          // Color selection
+          let cellColor;
+          if (isBrightSand) {
+            cellColor = '#FF5722'; // Bright amber-orange sand
+          } else if (isSand) {
+            cellColor = '#E65100'; // Deep rich amber sand
+          } else {
+            cellColor = '#09090B'; // Crisp black dither frame
+          }
 
           if (renderMode === 'dither') {
             // Ordered Bayer Dithering 4x4
-            // Subdivide 16px cell into 4x4 pixels (each 4px x 4px)
             const subSize = cellSize / 4;
             ctx.fillStyle = cellColor;
 
             for (let sy = 0; sy < 4; sy++) {
               for (let sx = 0; sx < 4; sx++) {
                 const threshold = BAYER_4X4[sy][sx];
-                // Inverted for light theme: higher lum = denser dither
-                if (lum > threshold) {
-                  // Draw dither dot/rect
-                  const dotPad = 0.5;
+                if (darkness > threshold) {
+                  const pad = 0.4;
                   ctx.fillRect(
-                    cellX + sx * subSize + dotPad,
-                    cellY + sy * subSize + dotPad,
-                    subSize - dotPad * 2,
-                    subSize - dotPad * 2
+                    cellX + sx * subSize + pad,
+                    cellY + sy * subSize + pad,
+                    subSize - pad * 2,
+                    subSize - pad * 2
                   );
                 }
               }
             }
-          } else if (renderMode === 'characters') {
-            // "nnnnn" Character mode: draw ASCII glyph based on luminance
-            const charIdx = Math.floor(lum * (charCount - 1));
-            const glyph = charList[charIdx];
+          } else {
+            // "nnnnn" Character mode
+            const charIdx = Math.floor(darkness * (NNNNN_CHARS.length - 1));
+            const glyph = NNNNN_CHARS[charIdx];
             if (glyph && glyph !== ' ') {
               ctx.fillStyle = cellColor;
               ctx.fillText(glyph, cellX + cellSize / 2, cellY + cellSize / 2);
-            }
-          } else if (renderMode === 'dots') {
-            // Halftone circular dots
-            const radius = (cellSize / 2 - 1) * lum;
-            if (radius > 0.5) {
-              ctx.fillStyle = cellColor;
-              ctx.beginPath();
-              ctx.arc(cellX + cellSize / 2, cellY + cellSize / 2, radius, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          } else if (renderMode === 'matrix') {
-            // Code rain ASCII glyphs
-            const matrixChars = CHAR_SETS.matrix;
-            const codeChar = matrixChars[Math.floor(Math.random() * matrixChars.length)];
-            if (lum > 0.2) {
-              ctx.fillStyle = isAccent ? '#FF1818' : lum > 0.6 ? '#000000' : '#71717A';
-              ctx.fillText(codeChar, cellX + cellSize / 2, cellY + cellSize / 2);
             }
           }
         }
       }
 
       // -------------------------------------------------------------
-      // 3. Post-FX: Vignette (intensity 38) & Bloom (intensity 25)
+      // 3. Post-Effects (pfx)
       // -------------------------------------------------------------
-      // Vignette
-      const diag = Math.sqrt(width * width + height * height);
-      const vigGrad = ctx.createRadialGradient(
-        width / 2,
-        height / 2,
-        diag * 0.28,
-        width / 2,
-        height / 2,
-        diag * 0.72
-      );
-      // Intensity 38%
-      vigGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-      vigGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0.08)');
-      vigGrad.addColorStop(1, 'rgba(0, 0, 0, 0.38)');
-      ctx.fillStyle = vigGrad;
-      ctx.fillRect(0, 0, width, height);
-
-      // Bloom: Subtle soft radial glow at center (intensity 25%)
+      // 3a. Bloom: 25% intensity (Warm amber glow around sand)
       const bloomGrad = ctx.createRadialGradient(
-        cx * cellSize,
-        cy * cellSize,
-        10,
-        cx * cellSize,
-        cy * cellSize,
-        maxDim * cellSize * 0.45
+        centerX,
+        centerY + 10,
+        15,
+        centerX,
+        centerY + 10,
+        Math.min(width, height) * 0.4
       );
-      bloomGrad.addColorStop(0, 'rgba(255, 24, 24, 0.12)'); // Swiss Red accent bloom
-      bloomGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.08)');
+      bloomGrad.addColorStop(0, 'rgba(230, 81, 0, 0.16)');
+      bloomGrad.addColorStop(0.5, 'rgba(255, 152, 0, 0.05)');
       bloomGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
       ctx.fillStyle = bloomGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // 3b. Vignette: 38% intensity
+      const diag = Math.sqrt(width * width + height * height);
+      const vigGrad = ctx.createRadialGradient(
+        centerX,
+        centerY,
+        diag * 0.28,
+        centerX,
+        centerY,
+        diag * 0.72
+      );
+      vigGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      vigGrad.addColorStop(0.68, 'rgba(0, 0, 0, 0.08)');
+      vigGrad.addColorStop(1, 'rgba(0, 0, 0, 0.38)');
+      ctx.fillStyle = vigGrad;
       ctx.fillRect(0, 0, width, height);
 
       ctx.restore();
@@ -362,7 +327,7 @@ export default function AsciiCanvas({
         }}
       />
 
-      {/* Subtle floating 21st.dev style controls badge */}
+      {/* Floating 21st.dev style controls badge */}
       <div
         style={{
           position: 'absolute',
@@ -372,11 +337,11 @@ export default function AsciiCanvas({
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          background: 'rgba(255, 255, 255, 0.92)',
+          background: 'rgba(255, 255, 255, 0.94)',
           backdropFilter: 'blur(8px)',
           border: '1px solid #E4E4E7',
           padding: '4px 8px',
-          borderRadius: 0, // Swiss Red 0px radius
+          borderRadius: 0,
           fontSize: 11,
           fontFamily: 'monospace',
           color: '#000000',
@@ -385,7 +350,7 @@ export default function AsciiCanvas({
         }}
       >
         <span style={{ display: 'inline-block', width: 6, height: 6, background: '#FF1818', marginRight: 4 }} />
-        <span>ASCII:</span>
+        <span>nnnnn:</span>
         <button
           type="button"
           onClick={() => setRenderMode('dither')}
@@ -414,37 +379,7 @@ export default function AsciiCanvas({
             fontWeight: 700,
           }}
         >
-          nnnnn
-        </button>
-        <button
-          type="button"
-          onClick={() => setRenderMode('dots')}
-          style={{
-            background: renderMode === 'dots' ? '#000000' : 'transparent',
-            color: renderMode === 'dots' ? '#FFFFFF' : '#71717A',
-            border: 'none',
-            padding: '2px 6px',
-            fontSize: 10,
-            cursor: 'pointer',
-            fontWeight: 700,
-          }}
-        >
-          dots
-        </button>
-        <button
-          type="button"
-          onClick={() => setRenderMode('matrix')}
-          style={{
-            background: renderMode === 'matrix' ? '#000000' : 'transparent',
-            color: renderMode === 'matrix' ? '#FFFFFF' : '#71717A',
-            border: 'none',
-            padding: '2px 6px',
-            fontSize: 10,
-            cursor: 'pointer',
-            fontWeight: 700,
-          }}
-        >
-          matrix
+          characters
         </button>
       </div>
     </div>
