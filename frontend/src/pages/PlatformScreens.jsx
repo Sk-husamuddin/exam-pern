@@ -370,7 +370,7 @@ export function UnifiedLogin() {
           </p>
 
           <footer style={{ marginTop: 24, textAlign: 'center', fontSize: 11, color: '#71717A', borderTop: '1px solid #E4E4E7', paddingTop: 14 }}>
-            developed by <strong style={{ color: '#000000' }}>Y. Babu</strong> and <strong style={{ color: '#000000' }}>Shaik Husamuddin</strong>. CSE department . <strong style={{ color: '#000000' }}>LBRCE</strong>
+            Developed by <strong style={{ color: '#000000' }}>Y. Babu</strong> and <strong style={{ color: '#000000' }}>Shaik Husamuddin</strong>. CSE department . <strong style={{ color: '#000000' }}>LBRCE</strong>
           </footer>
         </div>
       </section>
