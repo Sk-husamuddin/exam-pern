@@ -323,8 +323,8 @@ button {
   padding: 0;
   display: block;
   min-height: 100vh;
-  border-right: 1px solid #E4E4E7;
-  background: #FFFFFF;
+  border-right: 1px solid #18181B;
+  background: #040905;
 }
 
 .auth-brand-copy {
