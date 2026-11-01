@@ -15,7 +15,7 @@ import {
   Trash2,
   Play,
   Square,
-  Sparkles,
+  BookOpenText,
   ChevronDown,
   ChevronUp,
   LogOut,
@@ -42,8 +42,8 @@ export default function FacultyDashboard() {
 
   const handleLogout = () => {
     try {
-      supabase.auth.signOut().catch(() => {});
-    } catch (_) {}
+      supabase.auth.signOut().catch(() => { });
+    } catch (_) { }
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
       if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
@@ -199,7 +199,7 @@ export default function FacultyDashboard() {
         <div style={style.headerContainer}>
           <div style={style.brandGroup}>
             <div style={style.brandIcon}>
-              <Sparkles size={20} color="#fff" />
+              <BookOpenText size={20} color="#fff" />
             </div>
             <div>
               <span style={style.brandTitle}>Exam Portal</span>
