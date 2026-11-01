@@ -1,42 +1,41 @@
 import React, { useEffect, useRef, useState } from 'react';
-import pikachuSrc from '../../assets/pikachu.png';
 
 /**
- * Terminal Pikachu — Recreates the "Terminal Pikachu" ASCII-art / dither effect
- * from 21st.dev (https://21st.dev/community/ascii) using Canvas2D.
+ * AsciiCanvas — Recreates the "nnnnn" ASCII-art / dither effect from 21st.dev
+ * (https://21st.dev/community/ascii) using high-performance Canvas2D.
  *
- * Parameters from 21st.dev recipe:
- * - renderMode: "dither" | "characters" ("binary")
- * - cellSize: 10
- * - coverage: 36
- * - brightness: 0, contrast: 115, edgeEmphasis: 40
- * - tint: "#00ff66", tintOpacity: 45, overlayBlend: "overlay"
- * - pfx:
- *     vignette: 38%
- *     scanLines: 28%
- *     chromatic: 40%
- *     bloom: 60%
- *     filmGrain: 40%
- *     glitch: 20%
- * - animated: true, animStyle: "flicker", animSpeed: 100, animIntensity: 60
+ * Parameters supported from 21st.dev recipe:
+ * - renderMode: "dither" | "characters" | "dots" | "matrix"
+ * - cellSize: 16
+ * - brightness: 12, contrast: 115
+ * - animStyle: "wave", animSpeed: 100, animIntensity: 60
+ * - pfx: vignette (intensity 38), bloom (intensity 25)
  */
 
-// 3x3 Bayer Dither Matrix normalized [0, 1]
-const BAYER_3X3 = [
-  [0 / 9, 7 / 9, 3 / 9],
-  [6 / 9, 5 / 9, 2 / 9],
-  [4 / 9, 1 / 9, 8 / 9],
+// 4x4 Bayer Ordered Dither Matrix normalized [0, 1]
+const BAYER_4X4 = [
+  [0 / 16, 8 / 16, 2 / 16, 10 / 16],
+  [12 / 16, 4 / 16, 14 / 16, 6 / 16],
+  [3 / 16, 11 / 16, 1 / 16, 9 / 16],
+  [15 / 16, 7 / 16, 13 / 16, 5 / 16],
 ];
 
+// ASCII glyph palette ordered by perceived luminance
+const CHAR_SETS = {
+  standard: [' ', '·', ':', '!', '+', 'x', '*', '#', '%', '@'],
+  nnnnn: [' ', '.', ':', '-', '=', 'n', 'N', 'M', '█'],
+  matrix: [' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+};
+
 export default function AsciiCanvas({
-  cellSize = 10,
+  initialMode = 'dither',
+  cellSize = 16,
   className = '',
   style = {},
 }) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
-  const [renderMode, setRenderMode] = useState('dither'); // 'dither' | 'binary'
-  const [scanLinesEnabled, setScanLinesEnabled] = useState(true);
+  const [renderMode, setRenderMode] = useState(initialMode);
   const mouseRef = useRef({ x: -1000, y: -1000, active: false });
 
   useEffect(() => {
@@ -52,16 +51,7 @@ export default function AsciiCanvas({
     let height = 0;
     let dpr = 1;
 
-    // Load Pikachu source photo
-    const img = new Image();
-    let imgLoaded = false;
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      imgLoaded = true;
-    };
-    img.src = pikachuSrc;
-
-    // Offscreen sampling canvas
+    // Offscreen buffer for rasterizing procedural 3D geometric subject
     const offscreen = document.createElement('canvas');
     const offCtx = offscreen.getContext ? offscreen.getContext('2d', { willReadFrequently: true }) : null;
 
@@ -76,13 +66,19 @@ export default function AsciiCanvas({
       canvas.height = Math.floor(height * dpr);
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
+
+      // Match offscreen grid size
+      const cols = Math.ceil(width / cellSize);
+      const rows = Math.ceil(height / cellSize);
+      offscreen.width = cols;
+      offscreen.height = rows;
     }
 
     const ro = new ResizeObserver(handleResize);
     ro.observe(container);
     handleResize();
 
-    // Mouse listener for interactive CRT interference
+    // Track mouse interaction
     const onMouseMove = (e) => {
       const rect = canvas.getBoundingClientRect();
       mouseRef.current = {
@@ -99,7 +95,8 @@ export default function AsciiCanvas({
     container.addEventListener('mousemove', onMouseMove);
     container.addEventListener('mouseleave', onMouseLeave);
 
-    const startTime = performance.now();
+    // Animation variables
+    let startTime = performance.now();
 
     function render(currentTime) {
       if (width === 0 || height === 0 || !ctx || !offCtx) {
@@ -108,11 +105,9 @@ export default function AsciiCanvas({
       }
 
       const elapsed = (currentTime - startTime) * 0.001; // seconds
-      const t = elapsed;
+      const speed = 1.0; // animSpeed = 100
+      const t = elapsed * speed;
 
-      // -------------------------------------------------------------
-      // 1. Grid setup & Sampling Pikachu onto low-res grid
-      // -------------------------------------------------------------
       const cols = Math.ceil(width / cellSize);
       const rows = Math.ceil(height / cellSize);
 
@@ -121,230 +116,210 @@ export default function AsciiCanvas({
         offscreen.height = rows;
       }
 
-      // Clear offscreen
-      offCtx.fillStyle = '#000000';
+      // -------------------------------------------------------------
+      // 1. Draw dynamic 3D geometric subject on low-res offscreen buffer
+      // -------------------------------------------------------------
+      offCtx.fillStyle = '#050505';
       offCtx.fillRect(0, 0, cols, rows);
 
-      if (imgLoaded && img.naturalWidth > 0) {
-        // Draw Pikachu centered with contain aspect ratio
-        const imgAspect = img.naturalWidth / img.naturalHeight;
-        const gridAspect = cols / rows;
+      const cx = cols / 2;
+      const cy = rows / 2;
+      const maxDim = Math.min(cols, rows);
 
-        let drawW, drawH, drawX, drawY;
-        if (gridAspect > imgAspect) {
-          // Canvas is wider than image: match height
-          drawH = rows * 0.88;
-          drawW = drawH * imgAspect;
-          drawX = (cols - drawW) / 2;
-          drawY = (rows - drawH) / 2;
-        } else {
-          // Canvas is taller: match width
-          drawW = cols * 0.84;
-          drawH = drawW / imgAspect;
-          drawX = (cols - drawW) / 2;
-          drawY = (rows - drawH) / 2;
-        }
+      // Rotating torus-knot / multi-ring 3D shape
+      const rotX = t * 0.65;
+      const rotY = t * 0.95;
+      const rotZ = t * 0.35;
 
-        offCtx.drawImage(img, drawX, drawY, drawW, drawH);
+      const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+      const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+      const cosZ = Math.cos(rotZ), sinZ = Math.sin(rotZ);
+
+      const numPoints = 220;
+      const pRadius = maxDim * 0.32;
+      const tubeRadius = maxDim * 0.14;
+
+      offCtx.lineWidth = 1.2;
+
+      // Draw procedural illuminated wireframe / ribbons
+      for (let i = 0; i < numPoints; i++) {
+        const u = (i / numPoints) * Math.PI * 4;
+        const v = (i / numPoints) * Math.PI * 8;
+
+        // Torus knot formula p=2, q=3
+        const r = pRadius * (0.8 + 0.3 * Math.sin(v + t));
+        const px0 = r * Math.cos(u);
+        const py0 = r * Math.sin(u);
+        const pz0 = tubeRadius * Math.sin(3 * u);
+
+        // Rotate 3D point
+        const y1 = py0 * cosX - pz0 * sinX;
+        const z1 = py0 * sinX + pz0 * cosX;
+
+        const x2 = px0 * cosY + z1 * sinY;
+        const z2 = -px0 * sinY + z1 * cosY;
+
+        const x3 = x2 * cosZ - y1 * sinZ;
+        const y3 = x2 * sinZ + y1 * cosZ;
+
+        const persp = 300 / (300 + z2);
+        const screenX = cx + x3 * persp;
+        const screenY = cy + y3 * persp;
+
+        // Depth-based brightness
+        const normZ = (z2 + tubeRadius * 2) / (tubeRadius * 4);
+        const b = Math.max(0.1, Math.min(1.0, normZ * 1.1));
+        const val = Math.floor(b * 255);
+
+        offCtx.fillStyle = `rgb(${val},${val},${val})`;
+        offCtx.fillRect(Math.floor(screenX), Math.floor(screenY), 2, 2);
       }
 
+      // Read back sampled luminance
       const imgData = offCtx.getImageData(0, 0, cols, rows);
       const pixels = imgData.data;
 
       // -------------------------------------------------------------
-      // 2. Flicker & CRT Glitch Calculations
-      // -------------------------------------------------------------
-      // animStyle: "flicker", animSpeed: 100, animIntensity: 60
-      const flickerNoise =
-        Math.sin(t * 37) * 0.03 +
-        Math.cos(t * 59) * 0.02 +
-        (Math.random() - 0.5) * 0.04;
-      const flickerFactor = 1.0 + flickerNoise * 0.6; // 60% animIntensity
-
-      // Glitch slice: random line jitter at 20% intensity
-      const glitchActive = Math.sin(t * 12) > 0.85;
-      const glitchRow = glitchActive ? Math.floor(Math.sin(t * 43) * 0.5 + 0.5 * rows) : -10;
-      const glitchOffset = glitchActive ? Math.floor((Math.random() - 0.5) * 6) : 0;
-
-      // -------------------------------------------------------------
-      // 3. Render Pass to Main Canvas
+      // 2. Render to main canvas with devicePixelRatio scaling
       // -------------------------------------------------------------
       ctx.save();
       ctx.scale(dpr, dpr);
 
-      // Terminal CRT dark green/black solid background (#030804)
-      ctx.fillStyle = '#040905';
+      // Background mode: "solid" white (#FFFFFF)
+      ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, width, height);
+
+      const mouse = mouseRef.current;
+      const charList = CHAR_SETS[renderMode === 'characters' ? 'nnnnn' : 'standard'];
+      const charCount = charList.length;
 
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'center';
-      ctx.font = `bold ${Math.floor(cellSize * 0.88)}px "Courier New", Courier, monospace`;
+      ctx.font = `bold ${Math.floor(cellSize * 0.85)}px "Courier New", Courier, monospace`;
 
-      const mouse = mouseRef.current;
-
-      // Pre-compute luminance array for edgeEmphasis
-      const lumMap = new Float32Array(cols * rows);
+      // Loop through cells
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const idx = (r * cols + c) * 4;
-          const pr = pixels[idx];
-          const pg = pixels[idx + 1];
-          const pb = pixels[idx + 2];
-          // Standard luminance
-          lumMap[r * cols + c] = (pr * 0.299 + pg * 0.587 + pb * 0.114) / 255;
-        }
-      }
+          let lum = (pixels[idx] * 0.299 + pixels[idx + 1] * 0.587 + pixels[idx + 2] * 0.114) / 255;
 
-      // Loop through cells and draw Pikachu ASCII / Dither
-      for (let r = 0; r < rows; r++) {
-        const isGlitchLine = Math.abs(r - glitchRow) < 2;
-        const colShift = isGlitchLine ? glitchOffset : 0;
+          // Wave Animation: animStyle="wave", animSpeed=100, animIntensity=60
+          const wave = Math.sin(c * 0.14 + r * 0.12 - t * 2.2) * 0.28 +
+                       Math.cos(c * 0.08 - r * 0.16 + t * 1.5) * 0.18;
+          lum += wave * 0.6; // 60% intensity
 
-        for (let c = 0; c < cols; c++) {
-          const sampleC = Math.max(0, Math.min(cols - 1, c + colShift));
-          const idx = r * cols + sampleC;
-          let lum = lumMap[idx];
-
-          // Edge emphasis: 40%
-          const left = lumMap[r * cols + Math.max(0, sampleC - 1)];
-          const right = lumMap[r * cols + Math.min(cols - 1, sampleC + 1)];
-          const top = lumMap[Math.max(0, r - 1) * cols + sampleC];
-          const bot = lumMap[Math.min(rows - 1, r + 1) * cols + sampleC];
-          const edge = Math.abs(right - left) + Math.abs(bot - top);
-          lum += edge * 0.4;
-
-          // Apply contrast: 115% (factor 1.15) & brightness: 0
-          lum = (lum - 0.5) * 1.15 + 0.5;
-
-          // Apply CRT flicker modulation
-          lum *= flickerFactor;
-
-          // Interactive mouse lightning / phosphor charge
+          // Interactive mouse wave ripple
           if (mouse.active) {
-            const cellX = c * cellSize + cellSize / 2;
-            const cellY = r * cellSize + cellSize / 2;
-            const dx = cellX - mouse.x;
-            const dy = cellY - mouse.y;
+            const cellCenterX = c * cellSize + cellSize / 2;
+            const cellCenterY = r * cellSize + cellSize / 2;
+            const dx = cellCenterX - mouse.x;
+            const dy = cellCenterY - mouse.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 180) {
-              const mouseSpark = Math.sin(dist * 0.1 - t * 8.0) * Math.exp(-dist / 90);
-              lum += mouseSpark * 0.35;
+            if (dist < 260) {
+              const mouseWave = Math.sin(dist * 0.06 - t * 5.0) * Math.exp(-dist / 140);
+              lum += mouseWave * 0.45;
             }
           }
 
-          lum = Math.max(0, Math.min(1.0, lum));
-
-          // Coverage: 36%
-          // Only cells above coverage threshold get drawn (keeps dark background crisp)
-          const coverageThreshold = 0.36 * (1.0 - lum * 0.5);
-          if (lum < 0.12 && lum < coverageThreshold) continue;
+          // Parameter adjustments:
+          // brightness: +12%
+          lum += 0.12;
+          // contrast: 115%
+          lum = (lum - 0.5) * 1.15 + 0.5;
+          // Clamp to [0, 1]
+          lum = Math.max(0, Math.min(1, lum));
 
           const cellX = c * cellSize;
           const cellY = r * cellSize;
 
-          // Color pipeline: Terminal phosphor green #00ff66 with 45% tint overlay
-          // Highlight shades transition from rich terminal green to electric mint white
-          let fillStyle;
-          if (lum > 0.85) {
-            fillStyle = '#D4FFAA'; // Electric bright phosphor highlight
-          } else if (lum > 0.6) {
-            fillStyle = '#55FF99'; // Vibrant mint green
-          } else if (lum > 0.35) {
-            fillStyle = '#00FF66'; // Pure Terminal green (#00ff66)
-          } else {
-            fillStyle = '#008833'; // Deep shadow phosphor
-          }
+          // Determine color: Deep black (#09090b) or Swiss Red (#FF1818) on wave crests
+          const isAccent = lum > 0.82 && ((c + r) % 5 === 0);
+          const cellColor = isAccent ? '#FF1818' : '#09090B';
 
           if (renderMode === 'dither') {
-            // Ordered Bayer Dither 3x3
-            const subSize = cellSize / 3;
-            ctx.fillStyle = fillStyle;
+            // Ordered Bayer Dithering 4x4
+            // Subdivide 16px cell into 4x4 pixels (each 4px x 4px)
+            const subSize = cellSize / 4;
+            ctx.fillStyle = cellColor;
 
-            for (let sy = 0; sy < 3; sy++) {
-              for (let sx = 0; sx < 3; sx++) {
-                const threshold = BAYER_3X3[sy][sx];
-                if (lum > threshold * 0.9) {
+            for (let sy = 0; sy < 4; sy++) {
+              for (let sx = 0; sx < 4; sx++) {
+                const threshold = BAYER_4X4[sy][sx];
+                // Inverted for light theme: higher lum = denser dither
+                if (lum > threshold) {
+                  // Draw dither dot/rect
+                  const dotPad = 0.5;
                   ctx.fillRect(
-                    cellX + sx * subSize + 0.5,
-                    cellY + sy * subSize + 0.5,
-                    subSize - 0.8,
-                    subSize - 0.8
+                    cellX + sx * subSize + dotPad,
+                    cellY + sy * subSize + dotPad,
+                    subSize - dotPad * 2,
+                    subSize - dotPad * 2
                   );
                 }
               }
             }
-          } else {
-            // Binary mode: '0' and '1' ASCII code
-            const binaryChar = (c + r + Math.floor(t * 3)) % 2 === 0 ? '1' : '0';
-            ctx.fillStyle = fillStyle;
-            ctx.fillText(binaryChar, cellX + cellSize / 2, cellY + cellSize / 2);
+          } else if (renderMode === 'characters') {
+            // "nnnnn" Character mode: draw ASCII glyph based on luminance
+            const charIdx = Math.floor(lum * (charCount - 1));
+            const glyph = charList[charIdx];
+            if (glyph && glyph !== ' ') {
+              ctx.fillStyle = cellColor;
+              ctx.fillText(glyph, cellX + cellSize / 2, cellY + cellSize / 2);
+            }
+          } else if (renderMode === 'dots') {
+            // Halftone circular dots
+            const radius = (cellSize / 2 - 1) * lum;
+            if (radius > 0.5) {
+              ctx.fillStyle = cellColor;
+              ctx.beginPath();
+              ctx.arc(cellX + cellSize / 2, cellY + cellSize / 2, radius, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else if (renderMode === 'matrix') {
+            // Code rain ASCII glyphs
+            const matrixChars = CHAR_SETS.matrix;
+            const codeChar = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+            if (lum > 0.2) {
+              ctx.fillStyle = isAccent ? '#FF1818' : lum > 0.6 ? '#000000' : '#71717A';
+              ctx.fillText(codeChar, cellX + cellSize / 2, cellY + cellSize / 2);
+            }
           }
         }
       }
 
       // -------------------------------------------------------------
-      // 4. Post-Effects (pfx)
+      // 3. Post-FX: Vignette (intensity 38) & Bloom (intensity 25)
       // -------------------------------------------------------------
-
-      // 4a. Bloom: 60% intensity (Phosphor glow from Pikachu's center)
-      const bloomGrad = ctx.createRadialGradient(
-        width / 2,
-        height * 0.48,
-        20,
-        width / 2,
-        height * 0.48,
-        Math.min(width, height) * 0.55
-      );
-      bloomGrad.addColorStop(0, 'rgba(0, 255, 102, 0.24)');
-      bloomGrad.addColorStop(0.5, 'rgba(0, 255, 102, 0.08)');
-      bloomGrad.addColorStop(1, 'rgba(0, 255, 102, 0)');
-      ctx.fillStyle = bloomGrad;
-      ctx.fillRect(0, 0, width, height);
-
-      // 4b. ScanLines: 28% intensity
-      if (scanLinesEnabled) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
-        for (let y = 0; y < height; y += 3) {
-          ctx.fillRect(0, y, width, 1.2);
-        }
-        // Subtle moving CRT beam line
-        const beamY = ((t * 80) % height);
-        ctx.fillStyle = 'rgba(0, 255, 102, 0.06)';
-        ctx.fillRect(0, beamY - 4, width, 8);
-      }
-
-      // 4c. Chromatic Aberration: 40% intensity (RGB phosphor fringing)
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      ctx.fillStyle = 'rgba(0, 255, 102, 0.05)';
-      ctx.fillRect(1.5, 0, width, height);
-      ctx.fillStyle = 'rgba(0, 100, 255, 0.03)';
-      ctx.fillRect(-1.5, 0, width, height);
-      ctx.restore();
-
-      // 4d. Film Grain: 40% intensity
-      // Sample 300 random terminal noise specs
-      ctx.fillStyle = 'rgba(0, 255, 102, 0.12)';
-      for (let i = 0; i < 280; i++) {
-        const nx = Math.random() * width;
-        const ny = Math.random() * height;
-        ctx.fillRect(nx, ny, 1, 1);
-      }
-
-      // 4e. Vignette: 38% intensity (Curved CRT tube dark edges)
+      // Vignette
       const diag = Math.sqrt(width * width + height * height);
       const vigGrad = ctx.createRadialGradient(
         width / 2,
         height / 2,
-        diag * 0.26,
+        diag * 0.28,
         width / 2,
         height / 2,
-        diag * 0.68
+        diag * 0.72
       );
-      vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      vigGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.15)');
-      vigGrad.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
+      // Intensity 38%
+      vigGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      vigGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0.08)');
+      vigGrad.addColorStop(1, 'rgba(0, 0, 0, 0.38)');
       ctx.fillStyle = vigGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Bloom: Subtle soft radial glow at center (intensity 25%)
+      const bloomGrad = ctx.createRadialGradient(
+        cx * cellSize,
+        cy * cellSize,
+        10,
+        cx * cellSize,
+        cy * cellSize,
+        maxDim * cellSize * 0.45
+      );
+      bloomGrad.addColorStop(0, 'rgba(255, 24, 24, 0.12)'); // Swiss Red accent bloom
+      bloomGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.08)');
+      bloomGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = bloomGrad;
       ctx.fillRect(0, 0, width, height);
 
       ctx.restore();
@@ -359,7 +334,7 @@ export default function AsciiCanvas({
       container.removeEventListener('mousemove', onMouseMove);
       container.removeEventListener('mouseleave', onMouseLeave);
     };
-  }, [renderMode, scanLinesEnabled, cellSize]);
+  }, [renderMode, cellSize]);
 
   return (
     <div
@@ -371,7 +346,7 @@ export default function AsciiCanvas({
         width: '100%',
         height: '100%',
         overflow: 'hidden',
-        backgroundColor: '#040905',
+        backgroundColor: '#FFFFFF',
         ...style,
       }}
     >
@@ -387,44 +362,7 @@ export default function AsciiCanvas({
         }}
       />
 
-      {/* Cyberpunk Terminal HUD Overlay Header */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 20,
-          left: 20,
-          zIndex: 10,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-          fontFamily: 'ui-monospace, Consolas, monospace',
-          fontSize: 11,
-          color: '#00FF66',
-          textShadow: '0 0 8px rgba(0,255,102,0.6)',
-          letterSpacing: '0.08em',
-          userSelect: 'none',
-          pointerEvents: 'none',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
-            style={{
-              display: 'inline-block',
-              width: 8,
-              height: 8,
-              background: '#00FF66',
-              boxShadow: '0 0 8px #00FF66',
-              borderRadius: '50%',
-            }}
-          />
-          <strong>TERMINAL PIKACHU // 21ST.DEV</strong>
-        </div>
-        <div style={{ fontSize: 10, color: '#39A96B', opacity: 0.9 }}>
-          CRT 60Hz • DITHER PFX • PHOSPHOR GREEN
-        </div>
-      </div>
-
-      {/* Floating 21st.dev style controls badge */}
+      {/* Subtle floating 21st.dev style controls badge */}
       <div
         style={{
           position: 'absolute',
@@ -434,26 +372,26 @@ export default function AsciiCanvas({
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          background: 'rgba(4, 15, 7, 0.92)',
+          background: 'rgba(255, 255, 255, 0.92)',
           backdropFilter: 'blur(8px)',
-          border: '1px solid #00FF66',
-          boxShadow: '0 0 12px rgba(0, 255, 102, 0.25)',
+          border: '1px solid #E4E4E7',
           padding: '4px 8px',
-          borderRadius: 0,
+          borderRadius: 0, // Swiss Red 0px radius
           fontSize: 11,
           fontFamily: 'monospace',
-          color: '#00FF66',
+          color: '#000000',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           userSelect: 'none',
         }}
       >
-        <span style={{ display: 'inline-block', width: 6, height: 6, background: '#00FF66', marginRight: 4 }} />
-        <span>MODE:</span>
+        <span style={{ display: 'inline-block', width: 6, height: 6, background: '#FF1818', marginRight: 4 }} />
+        <span>ASCII:</span>
         <button
           type="button"
           onClick={() => setRenderMode('dither')}
           style={{
-            background: renderMode === 'dither' ? '#00FF66' : 'transparent',
-            color: renderMode === 'dither' ? '#000000' : '#39A96B',
+            background: renderMode === 'dither' ? '#000000' : 'transparent',
+            color: renderMode === 'dither' ? '#FFFFFF' : '#71717A',
             border: 'none',
             padding: '2px 6px',
             fontSize: 10,
@@ -465,10 +403,10 @@ export default function AsciiCanvas({
         </button>
         <button
           type="button"
-          onClick={() => setRenderMode('binary')}
+          onClick={() => setRenderMode('characters')}
           style={{
-            background: renderMode === 'binary' ? '#00FF66' : 'transparent',
-            color: renderMode === 'binary' ? '#000000' : '#39A96B',
+            background: renderMode === 'characters' ? '#000000' : 'transparent',
+            color: renderMode === 'characters' ? '#FFFFFF' : '#71717A',
             border: 'none',
             padding: '2px 6px',
             fontSize: 10,
@@ -476,23 +414,37 @@ export default function AsciiCanvas({
             fontWeight: 700,
           }}
         >
-          binary
+          nnnnn
         </button>
-        <span style={{ color: '#00FF66', opacity: 0.4 }}>|</span>
         <button
           type="button"
-          onClick={() => setScanLinesEnabled((prev) => !prev)}
+          onClick={() => setRenderMode('dots')}
           style={{
-            background: scanLinesEnabled ? '#003311' : 'transparent',
-            color: '#00FF66',
-            border: '1px solid #00FF66',
+            background: renderMode === 'dots' ? '#000000' : 'transparent',
+            color: renderMode === 'dots' ? '#FFFFFF' : '#71717A',
+            border: 'none',
             padding: '2px 6px',
             fontSize: 10,
             cursor: 'pointer',
             fontWeight: 700,
           }}
         >
-          {scanLinesEnabled ? 'scanlines: on' : 'scanlines: off'}
+          dots
+        </button>
+        <button
+          type="button"
+          onClick={() => setRenderMode('matrix')}
+          style={{
+            background: renderMode === 'matrix' ? '#000000' : 'transparent',
+            color: renderMode === 'matrix' ? '#FFFFFF' : '#71717A',
+            border: 'none',
+            padding: '2px 6px',
+            fontSize: 10,
+            cursor: 'pointer',
+            fontWeight: 700,
+          }}
+        >
+          matrix
         </button>
       </div>
     </div>
