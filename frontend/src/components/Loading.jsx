@@ -1,10 +1,11 @@
 import React from 'react';
 import Clock from './ui/clock';
+import GhostLoader from './ui/GhostLoader';
 
 /**
- * Full-page loading indicator using the Swiss Red animated Clock spinner.
+ * Screen loading indicator using the animated 8-bit Ghost Loader.
  */
-export default function Loading({ message = 'Loading…', size = 52, color = '#FF1818' }) {
+export default function Loading({ message = 'Loading…', scale = 0.85 }) {
   return (
     <div
       role="status"
@@ -15,12 +16,12 @@ export default function Loading({ message = 'Loading…', size = 52, color = '#F
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '55vh',
-        gap: 16,
+        gap: 20,
         padding: '40px 20px',
         color: '#000000',
       }}
     >
-      <Clock size={size} color={color} />
+      <GhostLoader scale={scale} />
       <p style={{ color: '#71717A', fontSize: 15, margin: 0, fontWeight: 600, letterSpacing: '-0.01em' }}>
         {message}
       </p>

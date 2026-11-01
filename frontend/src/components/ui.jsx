@@ -21,6 +21,7 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import Clock from './ui/clock';
+import GhostLoader from './ui/GhostLoader';
 
 export const Logo = ({ compact = false }) => (
   <a href="/" className="brand" aria-label="Smart Exam Platform home">
@@ -212,7 +213,7 @@ export function LoadingScreen() {
       <Logo />
       <div className="loading-center">
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-          <Clock size={56} color="#FF1818" />
+          <GhostLoader scale={0.85} />
         </div>
         <h1>Secure exam workspace</h1>
         <p>{tips[tip]}</p>
