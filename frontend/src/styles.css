@@ -318,13 +318,13 @@ button {
 }
 
 .auth-brand {
-  background: #FAFAFA;
-  color: #000000;
-  padding: 36px clamp(28px, 6vw, 85px);
-  display: flex;
-  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  display: block;
   min-height: 100vh;
   border-right: 1px solid #E4E4E7;
+  background: #FFFFFF;
 }
 
 .auth-brand-copy {
@@ -691,8 +691,11 @@ button {
     grid-template-columns: 1fr;
   }
   .auth-brand {
-    min-height: 280px;
-    padding: 28px;
+    min-height: 320px;
+    height: 340px;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
     border-right: none;
     border-bottom: 1px solid #E4E4E7;
   }

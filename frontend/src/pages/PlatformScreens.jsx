@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { Button, FormField, Logo } from '../components/ui.jsx';
+import AsciiCanvas from '../components/ui/AsciiCanvas.jsx';
 import { supabase, AUTH_BASE, API_BASE } from '../lib/supabase.js';
 
 // Unified Login portal at "/" for both faculty and students.
@@ -243,31 +244,8 @@ export function UnifiedLogin() {
 
   return (
     <div className="auth-page">
-      <section className="auth-brand">
-        <Logo />
-        <div className="auth-brand-copy">
-          <div className="eyebrow light">
-            <span className="eyebrow-dot" />
-            Smart Exam Platform
-          </div>
-          <h1>One portal for all assessments.</h1>
-          <p>
-            Secure, reliable exam workspace. Faculty manage assessments and monitors; students enter with their roll number and exam code.
-          </p>
-          <div className="auth-quote">
-            <ShieldCheck size={18} />
-            <span>
-              “Built for academic integrity, live monitoring, and effortless exam sessions.”
-              <small>— Smart Exam Engineering</small>
-            </span>
-          </div>
-        </div>
-        <div className="auth-brand-footer">
-          <div>Secure by default <span>•</span> Designed for colleges</div>
-          <div style={{ marginTop: 6, fontSize: 11, color: '#71717A' }}>
-            developed by <strong style={{ color: '#000000' }}>Y. Babu</strong> and <strong style={{ color: '#000000' }}>Shaik Husamuddin</strong>. CSE department . <strong style={{ color: '#000000' }}>LBRCE</strong>
-          </div>
-        </div>
+      <section className="auth-brand" aria-label="ASCII art visual">
+        <AsciiCanvas />
       </section>
 
       <section className="auth-form-area">
