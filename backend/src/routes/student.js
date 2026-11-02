@@ -1,7 +1,22 @@
 const express = require('express');
 const crypto = require('crypto');
 const { query, pool } = require('../db');
-const { verifyStudentJwt, verifyStudentSession, verifyStudentJwtOrSession } = require('../middleware/auth');
+const {
+  verifyStudentJwt,
+  verifyStudentSession,
+  verifyStudentSessionFresh,
+  invalidateSession,
+  verifyStudentJwtOrSession,
+} = require('../middleware/auth');
+
+// Assigned questions don't change during a live exam, so cache them briefly
+// instead of querying the questions table on every 3s poll per student.
+const questionCache = new Map();
+const QUESTION_CACHE_TTL_MS = 30000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of questionCache) if (now - v.ts > QUESTION_CACHE_TTL_MS) questionCache.delete(k);
+}, 60000).unref();
 
 const router = express.Router();
 
@@ -81,6 +96,8 @@ router.post('/enter', verifyStudentJwtOrSession, async (req, res) => {
       }
 
       const row = r.rows[0];
+      invalidateSession(req.headers.authorization && req.headers.authorization.substring(7));
+      invalidateSession(row.token);
       const questions = Array.isArray(row.questions_json) ? row.questions_json : [];
       let position = 0;
       let questionText = null;
@@ -172,10 +189,18 @@ router.get('/state', verifyStudentSession, async (req, res) => {
     };
 
     if (status === 'live' && !s.locked && hasAssigned) {
-      const qRows = await query(
-        'SELECT id, q_no, body FROM questions WHERE id = ANY($1) AND exam_id = $2 ORDER BY q_no ASC',
-        [assignedIds, s.exam_id]
-      );
+      const qKey = `${s.exam_id}:${assignedIds.join(',')}`;
+      let qRows;
+      const qHit = questionCache.get(qKey);
+      if (qHit && Date.now() - qHit.ts < QUESTION_CACHE_TTL_MS) {
+        qRows = qHit.res;
+      } else {
+        qRows = await query(
+          'SELECT id, q_no, body FROM questions WHERE id = ANY($1) AND exam_id = $2 ORDER BY q_no ASC',
+          [assignedIds, s.exam_id]
+        );
+        questionCache.set(qKey, { res: qRows, ts: Date.now() });
+      }
       if (qRows.rows.length > 0) {
         out.questions = qRows.rows.map((r) => ({
           id: r.id,
@@ -205,7 +230,7 @@ router.get('/state', verifyStudentSession, async (req, res) => {
 // ------------------------------------------------------------------
 // Explicit leave / offline signal (called on beforeunload, pagehide, blur, tab switch)
 // ------------------------------------------------------------------
-router.post('/leave', verifyStudentSession, async (req, res) => {
+router.post('/leave', verifyStudentSessionFresh, async (req, res) => {
   try {
     await query("UPDATE exam_sessions SET last_seen = now() - interval '1 minute' WHERE id = $1", [req.student.id]);
     res.json({ ok: true });
@@ -220,7 +245,7 @@ router.post('/leave', verifyStudentSession, async (req, res) => {
 // Uses the exam session token returned by /enter.
 // Single atomic UPDATE: increments violations, locks if threshold reached.
 // ------------------------------------------------------------------
-router.post('/violation', verifyStudentSession, async (req, res) => {
+router.post('/violation', verifyStudentSessionFresh, async (req, res) => {
   try {
     const s = req.student;
     const reason = String(req.body.reason || 'Unknown').substring(0, 100);
