@@ -1,299 +1,121 @@
+const express = require('express');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../db');
 const config = require('../config');
+const { verifyFaculty } = require('../middleware/auth');
+
+const router = express.Router();
 
 // ------------------------------------------------------------------
-// In-memory cache for Supabase token validations (keyed by token hash).
-// Avoids a network call to Supabase on every request. TTL ~60s.
+// Faculty profile: create/update the calling faculty user's own profile.
+// Requires a valid Supabase faculty Bearer token. Never trusts body auth_user_id.
 // ------------------------------------------------------------------
-const tokenCache = new Map();
-const CACHE_TTL_MS = 60 * 1000;
-
-function cacheGet(token) {
-  const entry = tokenCache.get(token);
-  if (!entry) return null;
-  if (Date.now() - entry.ts > CACHE_TTL_MS) {
-    tokenCache.delete(token);
-    return null;
-  }
-  return entry.data;
-}
-
-function cacheSet(token, data) {
-  tokenCache.set(token, { data, ts: Date.now() });
-}
-
-// ------------------------------------------------------------------
-// Verify Supabase faculty token by calling Supabase /auth/v1/user.
-// This is algorithm-agnostic (works with RS256/ECC P-256, not just HS256).
-// Auto-provisions the profiles row if missing.
-// ------------------------------------------------------------------
-async function verifyFaculty(req, res, next) {
+router.post('/faculty/profile', verifyFaculty, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    const { username, name } = req.body;
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ error: 'Username is required' });
     }
+    const authUserId = req.faculty.id;
+    const displayName = (name || '').trim() || username.trim();
 
-    const token = authHeader.substring(7);
-
-    // Check cache first
-    let supabaseUser = cacheGet(token);
-    if (!supabaseUser) {
-      try {
-        const supabaseRes = await fetch(`${config.SUPABASE_URL}/auth/v1/user`, {
-          headers: {
-            apikey: config.SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!supabaseRes.ok) {
-          let msg = 'Invalid or expired faculty token';
-          if (supabaseRes.status === 401) msg = 'Invalid or expired faculty token';
-          if (supabaseRes.status === 403) msg = 'Forbidden faculty token';
-          return res.status(401).json({ error: msg });
-        }
-        supabaseUser = await supabaseRes.json();
-        cacheSet(token, supabaseUser);
-      } catch (fetchErr) {
-        console.error('Supabase /auth/v1/user fetch error:', fetchErr.message);
-        return res.status(401).json({ error: 'Unable to verify faculty token' });
-      }
-    }
-
-    const authUserId = supabaseUser.id;
-    if (!authUserId) {
-      return res.status(401).json({ error: 'Token missing subject' });
-    }
-
-    // Auto-provision profile if missing (ON CONFLICT DO NOTHING)
-    const email = supabaseUser.email || '';
-    const usernameBase = email.split('@')[0] || 'user';
-    let username = usernameBase;
-
-    const { rows: existing } = await query(
-      'SELECT id, username, name, role FROM profiles WHERE auth_user_id = $1 AND role = $2',
-      [authUserId, 'faculty']
+    const { rows } = await query(
+      `INSERT INTO profiles (auth_user_id, username, name, role)
+       VALUES ($1, $2, $3, 'faculty')
+       ON CONFLICT (username) DO UPDATE SET name = EXCLUDED.name, auth_user_id = EXCLUDED.auth_user_id
+       WHERE profiles.id = EXCLUDED.id
+       RETURNING id, username, name, role`,
+      [authUserId, username.trim(), displayName]
     );
-
-    if (existing.length === 0) {
-      // Ensure username uniqueness with numeric suffix
-      let suffix = 0;
-      let tryUsername = username;
+    if (rows.length === 0) {
+      // Username taken by a different user; try with suffix
+      let suffix = 1;
+      let tryUsername = `${username.trim()}${suffix}`;
       while (true) {
-        const { rows: dup } = await query('SELECT 1 FROM profiles WHERE username = $1', [tryUsername]);
+        const { rows: dup } = await query('SELECT 1 FROM profiles WHERE username = $1 AND id <> $2', [tryUsername, authUserId]);
         if (dup.length === 0) break;
         suffix++;
-        tryUsername = `${usernameBase}${suffix}`;
+        tryUsername = `${username.trim()}${suffix}`;
       }
-      username = tryUsername;
-
-      const { rows: inserted } = await query(
+      const { rows: rows2 } = await query(
         `INSERT INTO profiles (auth_user_id, username, name, role)
          VALUES ($1, $2, $3, 'faculty')
-         ON CONFLICT (username) DO NOTHING
          RETURNING id, username, name, role`,
-        [authUserId, username, email || username]
+        [authUserId, tryUsername, displayName]
       );
-
-      if (inserted.length === 0) {
-        // Race: username taken by concurrent insert. Re-fetch by auth_user_id.
-        const { rows: refetch } = await query(
-          'SELECT id, username, name, role FROM profiles WHERE auth_user_id = $1 AND role = $2',
-          [authUserId, 'faculty']
-        );
-        if (refetch.length === 0) {
-          return res.status(403).json({ error: 'Faculty profile not found' });
-        }
-        req.faculty = refetch[0];
-        next();
-        return;
-      }
-      req.faculty = inserted[0];
-    } else {
-      req.faculty = existing[0];
+      return res.json({ ok: true, profile: rows2[0], username: tryUsername });
     }
-
-    next();
+    res.json({ ok: true, profile: rows[0] });
   } catch (err) {
-    console.error('verifyFaculty error:', err.message);
+    console.error('faculty/profile error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
-}
+});
 
 // ------------------------------------------------------------------
-// Verify custom student JWT issued at /auth/student/login.
-// This identifies the student BEFORE an exam_sessions row exists.
-// Used by: POST /api/student/enter
+// Student login: roll number (username) + password.
+// By design password == username, but we verify bcrypt anyway.
 // ------------------------------------------------------------------
-async function verifyStudentJwt(req, res, next) {
+router.post('/student/login', async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.substring(7)
-      : req.body.token;
-
-    if (!token) {
-      return res.status(401).json({ error: 'Missing student JWT' });
-    }
-
-    let decoded;
-    try {
-      decoded = jwt.verify(token, config.STUDENT_JWT_SECRET);
-    } catch (err) {
-      return res.status(401).json({ error: 'Invalid or expired student token' });
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
     }
 
     const { rows } = await query(
-      'SELECT id, username, name, role FROM profiles WHERE id = $1 AND role = $2',
-      [decoded.userId, 'student']
+      'SELECT id, username, name, password_hash, role FROM profiles WHERE username = $1 AND role = $2',
+      [username, 'student']
     );
 
     if (rows.length === 0) {
-      return res.status(403).json({ error: 'Student profile not found' });
+      return res.status(401).json({ error: 'Invalid roll number or password' });
     }
 
-    req.student = { ...rows[0], userId: rows[0].id };
-    next();
-  } catch (err) {
-    console.error('verifyStudentJwt error:', err.message);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
-
-// ------------------------------------------------------------------
-// Verify custom student session token (stored in exam_sessions.token).
-// Returned by POST /api/student/enter.
-// Used by: GET /api/student/state, POST /api/student/violation
-// ------------------------------------------------------------------
-// Short-lived (2s) in-memory cache of the session row, keyed by token.
-// ~100 students polling every 3-5s would otherwise run a 3-table JOIN on
-// every poll. Routes that WRITE based on session state (/violation, /leave)
-// use the *Fresh* verifier below so counters are never stale.
-const sessionCache = new Map();
-const SESSION_CACHE_TTL_MS = 2000;
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of sessionCache) {
-    if (now - v.ts > SESSION_CACHE_TTL_MS * 5) sessionCache.delete(k);
-  }
-}, 30000).unref();
-
-function invalidateSession(token) {
-  if (token) sessionCache.delete(token);
-}
-
-function makeSessionVerifier({ useCache }) {
-  return async function verifyStudentSession(req, res, next) {
-    try {
-      const authHeader = req.headers.authorization;
-      const token = authHeader && authHeader.startsWith('Bearer ')
-        ? authHeader.substring(7)
-        : req.body && req.body.token;
-
-      if (!token) {
-        return res.status(401).json({ error: 'Missing student session token' });
-      }
-
-      if (useCache) {
-        const hit = sessionCache.get(token);
-        if (hit && Date.now() - hit.ts < SESSION_CACHE_TTL_MS) {
-          req.student = hit.row;
-          return next();
-        }
-      }
-
-      const { rows } = await query(
-        `SELECT s.*, p.username, p.name, e.title, e.code, e.status, e.duration_min, e.max_violations, e.questions_per_student,
-                EXTRACT(EPOCH FROM e.started_at) as started_at_epoch,
-                EXTRACT(EPOCH FROM s.entered_at) as entered_at_epoch
-         FROM exam_sessions s
-         JOIN profiles p ON p.id = s.user_id
-         JOIN exams e ON e.id = s.exam_id
-         WHERE s.token = $1`,
-        [token]
-      );
-
-      if (rows.length === 0) {
-        sessionCache.delete(token);
-        return res.status(401).json({ status: 'kicked' });
-      }
-
-      req.student = rows[0];
-      if (useCache) sessionCache.set(token, { row: rows[0], ts: Date.now() });
-      next();
-    } catch (err) {
-      console.error('verifyStudentSession error:', err.message);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  };
-}
-
-const verifyStudentSession = makeSessionVerifier({ useCache: true });
-const verifyStudentSessionFresh = makeSessionVerifier({ useCache: false });
-
-// ------------------------------------------------------------------
-// Verify either student JWT or session token.
-// Allows POST /api/student/enter to be called with JWT or session token.
-// ------------------------------------------------------------------
-async function verifyStudentJwtOrSession(req, res, next) {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.substring(7)
-      : req.body.token;
-
-    if (!token) {
-      return res.status(401).json({ error: 'Missing student authentication token' });
+    const user = rows[0];
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid roll number or password' });
     }
 
-    // 1. Try JWT
-    try {
-      const decoded = jwt.verify(token, config.STUDENT_JWT_SECRET);
-      if (decoded && decoded.userId) {
-        const { rows } = await query(
-          'SELECT id, username, name, role FROM profiles WHERE id = $1 AND role = $2',
-          [decoded.userId, 'student']
-        );
-        if (rows.length > 0) {
-          req.student = { ...rows[0], userId: rows[0].id };
-          return next();
-        }
-      }
-    } catch (_) {
-      // Not a valid JWT, try session token lookup below
-    }
+    // Single-session token (replaces PHP session token)
 
-    // 2. Try session token lookup
-    const { rows } = await query(
-      `SELECT s.*, p.username, p.name, p.id as user_id, e.title, e.code, e.status, e.duration_min, e.max_violations, e.questions_per_student,
-              EXTRACT(EPOCH FROM e.started_at) as started_at_epoch,
-              EXTRACT(EPOCH FROM s.entered_at) as entered_at_epoch
-       FROM exam_sessions s
-       JOIN profiles p ON p.id = s.user_id
-       JOIN exams e ON e.id = s.exam_id
-       WHERE s.token = $1`,
-      [token]
+    // Insert or reuse session
+    let session;
+    const existing = await query('SELECT id FROM exam_sessions WHERE exam_id IS NULL AND user_id = $1', [user.id]);
+    // We don't know exam_id yet at login; create a placeholder session will be created on enter.
+    // Instead we just return token and user info; exam_sessions row is created when student enters exam code.
+    // To preserve single-session behavior, store token in a temporary column? 
+    // Simpler: return token; frontend sends exam_code with it on enter.
+
+    // Issue a short-lived student JWT for API auth (optional layer)
+    const studentJwt = jwt.sign(
+      { userId: user.id, username: user.username, role: 'student' },
+      config.STUDENT_JWT_SECRET,
+      { expiresIn: '12h' }
     );
 
-    if (rows.length > 0) {
-      req.student = { ...rows[0], userId: rows[0].user_id };
-      return next();
-    }
+    // Kick-out: rotate token for all existing exam sessions atomically so old
+    // browser is invalidated (same as PHP login.php behavior).
+    const token = crypto.randomBytes(16).toString('hex');
+    await query('UPDATE exam_sessions SET token = $1, last_seen = now() WHERE user_id = $2', [token, user.id]);
 
-    return res.status(401).json({ error: 'Invalid or expired student token' });
+    res.json({
+      ok: true,
+      token,
+      studentJwt,
+      user: { id: user.id, username: user.username, name: user.name, role: user.role },
+    });
   } catch (err) {
-    console.error('verifyStudentJwtOrSession error:', err.message);
+    console.error('student/login error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-}
+});
 
-module.exports = {
-  verifyFaculty,
-  verifyStudentJwt,
-  verifyStudentSession,
-  verifyStudentSessionFresh,
-  invalidateSession,
-  verifyStudentJwtOrSession,
-};
+router.post('/logout', (_req, res) => {
+  res.json({ ok: true, message: 'Logged out (clear client-side tokens)' });
+});
+
+module.exports = router;
