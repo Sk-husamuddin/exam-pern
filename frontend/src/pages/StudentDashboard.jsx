@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Clock, LogOut, AlertCircle, ShieldAlert, Maximize2, CheckCircle2 } from 'lucide-react';
 import { API_BASE } from '../lib/supabase.js';
@@ -10,7 +10,7 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const POLL_MS = 3000;
+  const POLL_MS = 5000;
 
   const studentUser = (() => {
     try {
@@ -27,22 +27,33 @@ export default function StudentDashboard() {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  const inFlight = useRef(false);
+
   async function poll() {
+    // Never stack requests: if the previous poll is still waiting, skip this tick.
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000); // 10s hard timeout
     try {
       const res = await fetch(`${API_BASE}/student/dashboard-state`, {
         headers: await authHeaders(),
+        signal: controller.signal,
       });
       if (res.status === 401 || res.status === 403) {
         sessionStorage.removeItem('exam_student_token');
         window.location.href = '/student/login';
         return;
       }
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const json = await res.json();
       setState(json || {});
       setError(null);
     } catch (err) {
       setError('Connection problem. Retrying automatically…');
     } finally {
+      clearTimeout(timer);
+      inFlight.current = false;
       setLoading(false);
     }
   }
