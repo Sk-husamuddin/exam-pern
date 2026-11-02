@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const multer = require('multer');
-const { query } = require('../db');
+const { query, pool } = require('../db');
 const { verifyFaculty } = require('../middleware/auth');
 const config = require('../config');
 
@@ -797,6 +797,72 @@ router.post('/action', verifyFaculty, async (req, res) => {
         `UPDATE exam_sessions SET locked = $1 WHERE id = $2 AND exam_id = $3`,
         [lock, sid, exam_id]
       );
+    } else if (action === 'rerandom') {
+      // Give one student a different set of questions (same "least used, random" pick as /enter).
+      if (!sid) return res.status(400).json({ error: 'sid is required' });
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        // Same lock key as fn_student_enter_exam, so it never clashes with students starting.
+        await client.query('SELECT pg_advisory_xact_lock($1::bigint)', [exam_id]);
+
+        const ex = await client.query('SELECT status, questions_per_student FROM exams WHERE id = $1', [exam_id]);
+        if (ex.rows.length === 0 || ex.rows[0].status !== 'live') {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'Exam is not live' });
+        }
+        const n = Math.max(1, parseInt(ex.rows[0].questions_per_student, 10) || 1);
+
+        const sess = await client.query(
+          'SELECT id, q_id, assigned_q_ids FROM exam_sessions WHERE id = $1 AND exam_id = $2 FOR UPDATE',
+          [sid, exam_id]
+        );
+        if (sess.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ error: 'Student session not found' });
+        }
+        const cur = new Set([...(sess.rows[0].assigned_q_ids || []), ...(sess.rows[0].q_id ? [sess.rows[0].q_id] : [])].map(String));
+        if (cur.size === 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'Student has not started yet' });
+        }
+
+        const pick = (exclude, limit) => client.query(
+          `SELECT q.id, q.q_no
+             FROM questions q
+             LEFT JOIN exam_sessions es
+               ON es.exam_id = $1 AND es.id <> $2 AND (es.q_id = q.id OR q.id = ANY(es.assigned_q_ids))
+            WHERE q.exam_id = $1 AND NOT (q.id = ANY($3::bigint[]))
+            GROUP BY q.id, q.q_no
+            ORDER BY COUNT(es.id) ASC, RANDOM()
+            LIMIT $4`,
+          [exam_id, sid, exclude, limit]
+        );
+
+        let picked = (await pick([...cur], n)).rows;
+        if (picked.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'No other question available to assign' });
+        }
+        if (picked.length < n) {
+          // Not enough other questions: top up with the least-used remaining ones.
+          const more = await pick(picked.map((r) => r.id), n - picked.length);
+          picked = picked.concat(more.rows);
+        }
+        picked.sort((a, b) => a.q_no - b.q_no);
+        const ids = picked.map((r) => r.id);
+
+        await client.query(
+          'UPDATE exam_sessions SET q_id = $1, assigned_q_ids = $2::bigint[] WHERE id = $3',
+          [ids[0], ids, sid]
+        );
+        await client.query('COMMIT');
+      } catch (e) {
+        try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
+        throw e;
+      } finally {
+        client.release();
+      }
     } else {
       return res.status(400).json({ error: 'Unknown action' });
     }
