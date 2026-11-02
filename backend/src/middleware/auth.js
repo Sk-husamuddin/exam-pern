@@ -166,39 +166,72 @@ async function verifyStudentJwt(req, res, next) {
 // Returned by POST /api/student/enter.
 // Used by: GET /api/student/state, POST /api/student/violation
 // ------------------------------------------------------------------
-async function verifyStudentSession(req, res, next) {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.substring(7)
-      : req.body.token;
+// Short-lived (2s) in-memory cache of the session row, keyed by token.
+// ~100 students polling every 3-5s would otherwise run a 3-table JOIN on
+// every poll. Routes that WRITE based on session state (/violation, /leave)
+// use the *Fresh* verifier below so counters are never stale.
+const sessionCache = new Map();
+const SESSION_CACHE_TTL_MS = 2000;
 
-    if (!token) {
-      return res.status(401).json({ error: 'Missing student session token' });
-    }
-
-    const { rows } = await query(
-      `SELECT s.*, p.username, p.name, e.title, e.code, e.status, e.duration_min, e.max_violations, e.questions_per_student,
-              EXTRACT(EPOCH FROM e.started_at) as started_at_epoch,
-              EXTRACT(EPOCH FROM s.entered_at) as entered_at_epoch
-       FROM exam_sessions s
-       JOIN profiles p ON p.id = s.user_id
-       JOIN exams e ON e.id = s.exam_id
-       WHERE s.token = $1`,
-      [token]
-    );
-
-    if (rows.length === 0) {
-      return res.status(401).json({ status: 'kicked' });
-    }
-
-    req.student = rows[0];
-    next();
-  } catch (err) {
-    console.error('verifyStudentSession error:', err.message);
-    res.status(500).json({ error: 'Internal server error' });
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of sessionCache) {
+    if (now - v.ts > SESSION_CACHE_TTL_MS * 5) sessionCache.delete(k);
   }
+}, 30000).unref();
+
+function invalidateSession(token) {
+  if (token) sessionCache.delete(token);
 }
+
+function makeSessionVerifier({ useCache }) {
+  return async function verifyStudentSession(req, res, next) {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = authHeader && authHeader.startsWith('Bearer ')
+        ? authHeader.substring(7)
+        : req.body && req.body.token;
+
+      if (!token) {
+        return res.status(401).json({ error: 'Missing student session token' });
+      }
+
+      if (useCache) {
+        const hit = sessionCache.get(token);
+        if (hit && Date.now() - hit.ts < SESSION_CACHE_TTL_MS) {
+          req.student = hit.row;
+          return next();
+        }
+      }
+
+      const { rows } = await query(
+        `SELECT s.*, p.username, p.name, e.title, e.code, e.status, e.duration_min, e.max_violations, e.questions_per_student,
+                EXTRACT(EPOCH FROM e.started_at) as started_at_epoch,
+                EXTRACT(EPOCH FROM s.entered_at) as entered_at_epoch
+         FROM exam_sessions s
+         JOIN profiles p ON p.id = s.user_id
+         JOIN exams e ON e.id = s.exam_id
+         WHERE s.token = $1`,
+        [token]
+      );
+
+      if (rows.length === 0) {
+        sessionCache.delete(token);
+        return res.status(401).json({ status: 'kicked' });
+      }
+
+      req.student = rows[0];
+      if (useCache) sessionCache.set(token, { row: rows[0], ts: Date.now() });
+      next();
+    } catch (err) {
+      console.error('verifyStudentSession error:', err.message);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  };
+}
+
+const verifyStudentSession = makeSessionVerifier({ useCache: true });
+const verifyStudentSessionFresh = makeSessionVerifier({ useCache: false });
 
 // ------------------------------------------------------------------
 // Verify either student JWT or session token.
@@ -256,4 +289,11 @@ async function verifyStudentJwtOrSession(req, res, next) {
   }
 }
 
-module.exports = { verifyFaculty, verifyStudentJwt, verifyStudentSession, verifyStudentJwtOrSession };
+module.exports = {
+  verifyFaculty,
+  verifyStudentJwt,
+  verifyStudentSession,
+  verifyStudentSessionFresh,
+  invalidateSession,
+  verifyStudentJwtOrSession,
+};
