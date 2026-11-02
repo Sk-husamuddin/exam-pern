@@ -17,6 +17,10 @@ const server = app.listen(PORT, () => {
   console.log(`BASE_URL: ${config.BASE_URL}`);
 });
 
+// Render's proxy keeps connections open ~60s+; Node's default 5s causes random 502s under load.
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+
 function gracefulShutdown(signal) {
   console.log(`Received ${signal}. Shutting down gracefully...`);
   server.close(async () => {
