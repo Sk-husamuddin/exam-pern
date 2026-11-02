@@ -76,6 +76,7 @@ export default function LiveMonitor() {
 
   async function act(action, sid) {
     if (action === 'end' && !confirm('End the exam for everyone?')) return;
+    if (action === 'rerandom' && !confirm('Give this student a different question?')) return;
     if (action === 'reconduct' && !confirm('Re-conduct this exam? Previous student sessions and violations will be reset.')) return;
 
     try {
@@ -294,6 +295,14 @@ export default function LiveMonitor() {
                   ) : (
                     <button onClick={() => act('lock', s.sid)} style={style.btnSmRed}>Lock</button>
                   )}
+                  {s && (s.position_str || s.position) ? (
+                    <button
+                      onClick={() => act('rerandom', s.sid)}
+                      style={{ ...style.btnSm, marginLeft: 6 }}
+                    >
+                      Re-random
+                    </button>
+                  ) : null}
                 </td>
               </tr>
             ))
