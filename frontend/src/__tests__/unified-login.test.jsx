@@ -138,7 +138,7 @@ describe('ExamScreen Student Identity Display', () => {
     sessionStorage.clear();
   });
 
-  it('displays student name and roll number in the top persistent header bar', async () => {
+  it('displays exam name and conducting date in the top persistent header bar', async () => {
     render(
       <MemoryRouter>
         <ExamScreen />
@@ -146,8 +146,8 @@ describe('ExamScreen Student Identity Display', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('studentName')).toHaveTextContent('Shaik Husamuddin');
-      expect(screen.getByTestId('studentRollNo')).toHaveTextContent('Roll No: 24761A05AU');
+      expect(screen.getByTestId('examTitle')).toHaveTextContent('Operating Systems');
+      expect(screen.getByTestId('examDate')).toHaveTextContent(/Date:/i);
     });
   });
 });

@@ -369,18 +369,20 @@ export default function ExamScreen() {
     data.entered &&
     isFullscreen;
 
+  const todayDateStr = new Date().toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+
   return (
     <div style={style.examRoot}>
       <header style={style.bar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <b id="examTitle" data-testid="examTitle">{data?.title || 'Exam'}</b>
           <span style={{ color: '#71717A' }}>&middot;</span>
-          <span id="studentRollNo" data-testid="studentRollNo" style={{ color: '#71717A', fontSize: 13, fontWeight: 500 }}>
-            {studentRollNo ? `Roll No: ${studentRollNo}` : ''}
-          </span>
-          {studentRollNo && <span style={{ color: '#71717A' }}>&middot;</span>}
-          <span id="studentName" data-testid="studentName" style={{ color: '#000000', fontSize: 13, fontWeight: 600 }}>
-            {studentName}
+          <span id="examDate" data-testid="examDate" style={{ color: '#71717A', fontSize: 13, fontWeight: 500 }}>
+            Date: {todayDateStr}
           </span>
         </div>
         <div>
@@ -449,11 +451,11 @@ export default function ExamScreen() {
               >
                 <div>
                   <span style={{ color: '#71717A', marginRight: 6 }}>Student Name:</span>
-                  <strong style={{ color: '#000000' }}>{studentName}</strong>
+                  <strong data-testid="studentName" style={{ color: '#000000' }}>{studentName}</strong>
                 </div>
                 <div>
                   <span style={{ color: '#71717A', marginRight: 6 }}>Roll Number:</span>
-                  <strong style={{ color: '#000000' }}>{studentRollNo || '—'}</strong>
+                  <strong data-testid="studentRollNo" style={{ color: '#000000' }}>{studentRollNo ? `Roll No: ${studentRollNo}` : '—'}</strong>
                 </div>
               </div>
 
