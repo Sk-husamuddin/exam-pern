@@ -382,14 +382,13 @@ router.post('/questions/import-docx', verifyFaculty, uploadDocx.single('file'), 
       items = paras.filter((p) => p.length > 0);
     }
 
-    const ignored = 0;
-    const used = mode;
+    const limitedItems = items.slice(0, 200);
 
     res.json({
       ok: true,
-      items,
+      items: limitedItems,
       ignored,
-      mode: used,
+      mode: usedMode,
       file: req.file.originalname,
       note: items.length > 200 ? 'Only the first 200 questions are shown.' : '',
     });
