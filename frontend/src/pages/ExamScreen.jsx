@@ -250,12 +250,14 @@ export default function ExamScreen() {
     }
 
     function handleBlur() {
-      // Blur can fire during clicks inside the window or focus shifts.
-      // Only record a violation if document is hidden or fullscreen was dropped.
-      if (document.hidden || !document.fullscreenElement) {
-        sendLeaveSignal();
-        recordViolation('Window lost focus');
-      }
+      // Blur can fire during scrollbar interaction or focus shifts inside the window.
+      // Confirm after a brief grace period whether document was actually hidden or fullscreen dropped.
+      setTimeout(() => {
+        if (document.hidden || !document.fullscreenElement) {
+          sendLeaveSignal();
+          recordViolation('Window lost focus');
+        }
+      }, 150);
     }
 
     function handleFullscreenChange() {
@@ -466,7 +468,7 @@ export default function ExamScreen() {
                         </span>
                       )}
                     </h2>
-                    <div style={style.question}>
+                    <div className="exam-question-scroll" style={style.question}>
                       {q.body || q.question}
                     </div>
                   </div>
@@ -474,7 +476,7 @@ export default function ExamScreen() {
               ) : (
                 <div>
                   <h2 style={{ marginBottom: 16, color: '#000000', fontSize: 20, fontWeight: 800 }}>Question {data.position || ''}</h2>
-                  <div style={style.question}>
+                  <div className="exam-question-scroll" style={style.question}>
                     {data.question || 'No question has been assigned yet. Please contact faculty.'}
                   </div>
                 </div>
@@ -529,7 +531,7 @@ const style = {
     borderBottom: '1px solid #E4E4E7',
   },
   timer: { fontSize: 20, fontWeight: 800, color: '#FF1818', fontFamily: 'ui-monospace, monospace' },
-  main: { maxWidth: 900, margin: '30px auto', padding: '0 20px' },
+  main: { maxWidth: 900, margin: '24px auto', padding: '0 20px 40px' },
   muted: { color: '#71717A' },
   card: {
     background: '#FFFFFF', borderRadius: 0, padding: 28,
@@ -537,10 +539,14 @@ const style = {
     boxShadow: 'none',
   },
   question: {
-    whiteSpace: 'pre-wrap', fontSize: 18, lineHeight: 1.65,
-    background: '#FAFAFA', padding: 24, borderRadius: 0,
+    whiteSpace: 'pre-wrap', fontSize: 18, lineHeight: 1.7,
+    background: '#FAFAFA', padding: '24px 28px', borderRadius: 0,
     border: '1px solid #E4E4E7', color: '#000000',
     boxShadow: 'none',
+    maxHeight: 'calc(100vh - 220px)',
+    overflowY: 'auto',
+    overflowX: 'auto',
+    wordBreak: 'break-word',
   },
   btnPrimaryLink: {
     display: 'inline-block',

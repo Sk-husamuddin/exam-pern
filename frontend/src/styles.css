@@ -740,3 +740,32 @@ button {
     scroll-behavior: auto !important;
   }
 }
+
+/* ==========================================================================
+   Exam Screen Scrollable Question Box (Safe from violations)
+   ========================================================================== */
+.exam-question-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #A1A1AA #F4F4F5;
+  overscroll-behavior: contain;
+}
+
+.exam-question-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.exam-question-scroll::-webkit-scrollbar-track {
+  background: #F4F4F5;
+  border: 1px solid #E4E4E7;
+}
+
+.exam-question-scroll::-webkit-scrollbar-thumb {
+  background: #A1A1AA;
+  border-radius: 0;
+  border: 2px solid #F4F4F5;
+}
+
+.exam-question-scroll::-webkit-scrollbar-thumb:hover {
+  background: #71717A;
+}

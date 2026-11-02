@@ -283,31 +283,104 @@ router.post('/questions/import-docx', verifyFaculty, uploadDocx.single('file'), 
     }
     const xml = await docXml.async('string');
 
-    // Simple paragraph extraction via regex (parity with original PHP logic)
+    // Extract paragraphs while preserving internal line breaks (<w:br/>) and tabs (<w:tab/>)
     const paras = [];
     const pRegex = /<w:p[^>]*>([\s\S]*?)<\/w:p>/g;
     let pMatch;
     while ((pMatch = pRegex.exec(xml)) !== null) {
-      const pContent = pMatch[1];
+      let pContent = pMatch[1];
+      // Convert line breaks and tabs
+      pContent = pContent.replace(/<w:br[^>]*\/?>/gi, '\n');
+      pContent = pContent.replace(/<w:tab[^>]*\/?>/gi, '\t');
+
       let text = '';
       const tRegex = /<w:t[^>]*>([\s\S]*?)<\/w:t>/g;
       let tMatch;
       while ((tMatch = tRegex.exec(pContent)) !== null) {
         text += tMatch[1];
       }
-      if (text.trim() !== '') {
-        paras.push({ text: text.replace(/\t/g, '\t'), num: false });
-      }
+      paras.push(text.trim());
     }
 
-    if (paras.length === 0) {
+    if (paras.filter((p) => p.length > 0).length === 0) {
       return res.status(400).json({ error: 'No questions found in the document.' });
     }
 
-    // Simple split: treat every non-empty paragraph as a question item (para mode)
-    // For marker/separator/blank modes, a more complex parser would be needed;
-    // here we return paragraphs as items so faculty can confirm/edit.
-    const items = paras.map((p) => p.text);
+    // Numbering / question marker regex: matches "1.", "1)", "(1)", "Q1.", "Question 1:", "Q.1", etc.
+    const MARKER_REGEX = /^(?:Q(?:uestion)?[\s.]*\d+[\s.:)\-]|(?:\(?\d+\)?[\s.:)\-]))\s*/i;
+    // Separator regex: matches lines like "---", "===", "***", "___"
+    const SEPARATOR_REGEX = /^[-=_*]{3,}$/;
+
+    let items = [];
+    let ignored = 0;
+    let usedMode = mode;
+
+    if (mode === 'auto') {
+      const hasMarkers = paras.some((p) => MARKER_REGEX.test(p));
+      const hasSeparators = paras.some((p) => SEPARATOR_REGEX.test(p));
+      const hasBlanks = paras.some((p, i) => p === '' && i > 0 && i < paras.length - 1 && paras[i - 1] !== '');
+
+      if (hasMarkers) usedMode = 'marker';
+      else if (hasSeparators) usedMode = 'separator';
+      else if (hasBlanks) usedMode = 'blank';
+      else usedMode = 'para';
+    }
+
+    if (usedMode === 'marker') {
+      let current = [];
+      let foundFirst = false;
+
+      for (const p of paras) {
+        if (MARKER_REGEX.test(p)) {
+          if (current.length > 0) {
+            items.push(current.join('\n\n').trim());
+            current = [];
+          }
+          foundFirst = true;
+          current.push(p);
+        } else if (foundFirst) {
+          if (p.length > 0) current.push(p);
+        } else {
+          if (p.length > 0) ignored++;
+        }
+      }
+      if (current.length > 0) {
+        items.push(current.join('\n\n').trim());
+      }
+    } else if (usedMode === 'separator') {
+      let current = [];
+      for (const p of paras) {
+        if (SEPARATOR_REGEX.test(p)) {
+          if (current.length > 0) {
+            items.push(current.join('\n\n').trim());
+            current = [];
+          }
+        } else if (p.length > 0) {
+          current.push(p);
+        }
+      }
+      if (current.length > 0) {
+        items.push(current.join('\n\n').trim());
+      }
+    } else if (usedMode === 'blank') {
+      let current = [];
+      for (const p of paras) {
+        if (p === '') {
+          if (current.length > 0) {
+            items.push(current.join('\n\n').trim());
+            current = [];
+          }
+        } else {
+          current.push(p);
+        }
+      }
+      if (current.length > 0) {
+        items.push(current.join('\n\n').trim());
+      }
+    } else {
+      // 'para' mode
+      items = paras.filter((p) => p.length > 0);
+    }
 
     const ignored = 0;
     const used = mode;

@@ -227,7 +227,7 @@ export default function QuestionsEditor() {
 
                   <div style={style.card}>
                     <h3 style={{ marginTop: 0 }}>2. Import from a Word document</h3>
-                    <p style={style.muted}>Upload a .docx file. You will see a preview and can edit or remove questions before saving.</p>
+                    <p style={style.muted}>Upload a .docx Word document. Multi-paragraph questions, code snippets, and numbered items (Q1, 1., etc.) are automatically detected and grouped.</p>
                     <form onSubmit={readDocx} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <label style={style.label}>Word file (.docx)</label>
                       <input type="file" name="file" accept=".docx" required onChange={handleFileSelect} />
