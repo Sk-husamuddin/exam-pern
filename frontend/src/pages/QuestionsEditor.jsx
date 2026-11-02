@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { apiGet, apiPost, apiPut, apiDelete, apiFormPost } from '../lib/api.js';
-import Loading from '../components/Loading.jsx';
+import Loading, { LoadingButtonContent } from '../components/Loading.jsx';
 import FacultyFooter from '../components/FacultyFooter.jsx';
 
 export default function QuestionsEditor() {
@@ -16,6 +16,7 @@ export default function QuestionsEditor() {
 
   // Manual add
   const [manualBody, setManualBody] = useState('');
+  const [adding, setAdding] = useState(false);
 
   // Word import
   const [file, setFile] = useState(null);
@@ -49,7 +50,8 @@ export default function QuestionsEditor() {
 
   async function addQuestion(e) {
     e.preventDefault();
-    if (!manualBody.trim()) return;
+    if (!manualBody.trim() || adding) return;
+    setAdding(true);
     try {
       const json = await apiPost('/faculty/questions', {
         exam_id: examId,
@@ -63,6 +65,8 @@ export default function QuestionsEditor() {
       }
     } catch (err) {
       setFlash({ type: 'err', msg: err.message || 'Add failed' });
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -221,7 +225,11 @@ export default function QuestionsEditor() {
                         placeholder="Write the question here..."
                         required
                       />
-                      <button type="submit" style={style.btnPrimary}>Add question</button>
+                      <button type="submit" style={style.btnPrimary} disabled={adding}>
+                        <LoadingButtonContent loading={adding} loadingLabel="Adding…">
+                          Add question
+                        </LoadingButtonContent>
+                      </button>
                     </form>
                   </div>
 
