@@ -26,7 +26,7 @@ const CHAR_SETS = {
 };
 
 export default function AsciiCanvas({
-  initialMode = 'dots',
+  initialMode = 'dither',
   cellSize = 12,
   className = '',
   style = {},
