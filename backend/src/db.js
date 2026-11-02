@@ -9,9 +9,11 @@ const isSupabase = config.DATABASE_URL && (
 
 const pool = new Pool({
   connectionString: config.DATABASE_URL,
-  max: 10,
+  max: parseInt(process.env.PG_POOL_MAX, 10) || 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 30000,
+  connectionTimeoutMillis: 8000,
+  statement_timeout: 10000,
+  query_timeout: 10000,
   ssl: isSupabase ? { rejectUnauthorized: false } : false,
 });
 
