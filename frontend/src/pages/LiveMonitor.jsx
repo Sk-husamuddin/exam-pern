@@ -11,6 +11,7 @@ export default function LiveMonitor() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [rerandomizing, setRerandomizing] = useState(false);
 
   const POLL_MS = 3000;
 
@@ -79,12 +80,18 @@ export default function LiveMonitor() {
     if (action === 'rerandom' && !confirm('Give this student a different question?')) return;
     if (action === 'reconduct' && !confirm('Re-conduct this exam? Previous student sessions and violations will be reset.')) return;
 
+    if (action === 'rerandom') {
+      if (rerandomizing) return;
+      setRerandomizing(true);
+    }
     try {
       const json = await apiPost('/faculty/action', { exam_id: examId, action, sid });
       if (json && json.error) alert(json.error);
       await poll();
     } catch (err) {
       alert(err.message || 'Action failed');
+    } finally {
+      if (action === 'rerandom') setRerandomizing(false);
     }
   }
 
@@ -165,6 +172,21 @@ export default function LiveMonitor() {
 
   return (
     <div style={style.page}>
+      {rerandomizing && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(255,255,255,0.92)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Loading message="Re-randomizing question…" />
+        </div>
+      )}
       <nav style={style.nav}>
         <Link to="/faculty/dashboard" style={style.link}>&larr; Back to dashboard</Link>
         <span style={style.spacer}></span>
