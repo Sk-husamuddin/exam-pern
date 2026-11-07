@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const multer = require('multer');
 const { query, pool } = require('../db');
-const { verifyFaculty } = require('../middleware/auth');
+const { verifyFaculty, invalidateSession } = require('../middleware/auth');
 const config = require('../config');
 
 const router = express.Router();
@@ -814,7 +814,7 @@ router.post('/action', verifyFaculty, async (req, res) => {
         const n = Math.max(1, parseInt(ex.rows[0].questions_per_student, 10) || 1);
 
         const sess = await client.query(
-          'SELECT id, q_id, assigned_q_ids FROM exam_sessions WHERE id = $1 AND exam_id = $2 FOR UPDATE',
+          'SELECT id, token, q_id, assigned_q_ids FROM exam_sessions WHERE id = $1 AND exam_id = $2 FOR UPDATE',
           [sid, exam_id]
         );
         if (sess.rows.length === 0) {
@@ -857,12 +857,59 @@ router.post('/action', verifyFaculty, async (req, res) => {
           [ids[0], ids, sid]
         );
         await client.query('COMMIT');
+        if (sess.rows[0].token) invalidateSession(sess.rows[0].token);
       } catch (e) {
         try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
         throw e;
       } finally {
         client.release();
       }
+    } else if (action === 'change_question' || action === 'assign_question') {
+      if (!sid) return res.status(400).json({ error: 'sid is required' });
+      const qIds = Array.isArray(req.body.question_ids) && req.body.question_ids.length > 0
+        ? req.body.question_ids
+        : (req.body.question_id ? [req.body.question_id] : []);
+      if (qIds.length === 0) {
+        return res.status(400).json({ error: 'question_id is required' });
+      }
+
+      // Verify selected questions belong to this exam
+      const qCheck = await query(
+        'SELECT id, q_no, body FROM questions WHERE id = ANY($1::bigint[]) AND exam_id = $2 ORDER BY q_no ASC',
+        [qIds, exam_id]
+      );
+      if (qCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Selected question not found for this exam' });
+      }
+
+      // Verify student session exists
+      const sess = await query(
+        'SELECT id, token, user_id, q_id, assigned_q_ids FROM exam_sessions WHERE id = $1 AND exam_id = $2',
+        [sid, exam_id]
+      );
+      if (sess.rows.length === 0) {
+        return res.status(404).json({ error: 'Student session not found' });
+      }
+
+      const newQIds = qCheck.rows.map((r) => r.id);
+      const primaryQId = newQIds[0];
+
+      await query(
+        'UPDATE exam_sessions SET q_id = $1, assigned_q_ids = $2::bigint[] WHERE id = $3 AND exam_id = $4',
+        [primaryQId, newQIds, sid, exam_id]
+      );
+
+      // Invalidate session cache so student poll instantly reflects the new question
+      if (sess.rows[0].token) invalidateSession(sess.rows[0].token);
+
+      const qnoStr = qCheck.rows.map((r) => `Q${r.q_no}`).join(', ');
+      return res.json({
+        ok: true,
+        message: `Assigned question ${qnoStr} successfully`,
+        assigned_qnos: qCheck.rows.map((r) => r.q_no),
+        q_no: qCheck.rows[0].q_no,
+        question_text: qCheck.rows[0].body,
+      });
     } else {
       return res.status(400).json({ error: 'Unknown action' });
     }

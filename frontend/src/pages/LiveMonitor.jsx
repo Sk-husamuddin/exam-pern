@@ -13,6 +13,13 @@ export default function LiveMonitor() {
   const [error, setError] = useState(null);
   const [rerandomizing, setRerandomizing] = useState(false);
 
+  // Manual Question Assignment Override
+  const [changeStudent, setChangeStudent] = useState(null);
+  const [examQuestions, setExamQuestions] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [assigningQId, setAssigningQId] = useState(null);
+  const [changeFlash, setChangeFlash] = useState(null);
+
   const POLL_MS = 3000;
 
   const failedPollsRef = useRef(0);
@@ -50,6 +57,9 @@ export default function LiveMonitor() {
         const detail = await apiGet(`/faculty/exams/${examId}`);
         if (mounted && detail && detail.exam) {
           setExam((prev) => ({ ...detail.exam, ...(prev || {}) }));
+          if (Array.isArray(detail.exam.questions)) {
+            setExamQuestions(detail.exam.questions);
+          }
         }
       } catch (err) {
         if (mounted && !examRef.current) setError(err.message || 'Failed to load exam details');
@@ -94,6 +104,71 @@ export default function LiveMonitor() {
       if (action === 'rerandom') setRerandomizing(false);
     }
   }
+
+  async function openChangeModal(s) {
+    setChangeStudent(s);
+    setSearchQuery('');
+    if (examQuestions.length === 0) {
+      try {
+        const detail = await apiGet(`/faculty/exams/${examId}`);
+        if (detail && detail.exam && Array.isArray(detail.exam.questions)) {
+          setExamQuestions(detail.exam.questions);
+        }
+      } catch (_) {}
+    }
+  }
+
+  async function handleAssignQuestion(q) {
+    if (!changeStudent || assigningQId != null) return;
+    setAssigningQId(q.id);
+    try {
+      const res = await apiPost('/faculty/action', {
+        exam_id: examId,
+        action: 'change_question',
+        sid: changeStudent.sid,
+        question_id: q.id,
+      });
+      if (res && res.error) {
+        alert(res.error);
+        return;
+      }
+      const targetSid = changeStudent.sid;
+      const targetName = changeStudent.name;
+      const targetUsername = changeStudent.username;
+
+      // Optimistically update student row in table
+      setStudents((prev) =>
+        prev.map((st) =>
+          st.sid === targetSid
+            ? {
+                ...st,
+                position: parseInt(q.q_no, 10),
+                position_str: `Q${q.q_no}`,
+                question_text: q.body,
+                assigned_qnos: [parseInt(q.q_no, 10)],
+              }
+            : st
+        )
+      );
+
+      setChangeFlash({
+        text: `Assigned Question ${q.q_no} to ${targetName} (${targetUsername})`,
+      });
+      setChangeStudent(null);
+      await poll();
+    } catch (err) {
+      alert(err.message || 'Failed to assign question');
+    } finally {
+      setAssigningQId(null);
+    }
+  }
+
+  const filteredQuestions = examQuestions.filter((q) => {
+    if (!searchQuery.trim()) return true;
+    const qnoMatch = String(q.q_no).includes(searchQuery.trim());
+    const bodyMatch = (q.body || '').toLowerCase().includes(searchQuery.trim().toLowerCase());
+    return qnoMatch || bodyMatch;
+  });
 
   function downloadCsv() {
     if (!students || students.length === 0) {
@@ -256,6 +331,33 @@ export default function LiveMonitor() {
         </div>
       </div>
 
+      {changeFlash && (
+        <div
+          style={{
+            background: '#FAFAFA',
+            border: '1px solid #E4E4E7',
+            borderLeft: '4px solid #FF1818',
+            color: '#000000',
+            padding: '12px 16px',
+            marginBottom: 16,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          <span>✓ {changeFlash.text}</span>
+          <button
+            onClick={() => setChangeFlash(null)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#71717A' }}
+            title="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 16 }}>
         <h3 style={{ margin: 0, fontSize: 16 }}>
           Students ({students.length})
@@ -318,12 +420,22 @@ export default function LiveMonitor() {
                     <button onClick={() => act('lock', s.sid)} style={style.btnSmRed}>Lock</button>
                   )}
                   {s && (s.position_str || s.position) ? (
-                    <button
-                      onClick={() => act('rerandom', s.sid)}
-                      style={{ ...style.btnSm, marginLeft: 6 }}
-                    >
-                      Re-random
-                    </button>
+                    <>
+                      <button
+                        onClick={() => act('rerandom', s.sid)}
+                        style={{ ...style.btnSm, marginLeft: 6 }}
+                        title="Randomly assign a different question"
+                      >
+                        Re-random
+                      </button>
+                      <button
+                        onClick={() => openChangeModal(s)}
+                        style={{ ...style.btnSmBlack, marginLeft: 6 }}
+                        title="Decide and manually select the exact question for this student"
+                      >
+                        Change
+                      </button>
+                    </>
                   ) : null}
                 </td>
               </tr>
@@ -331,6 +443,274 @@ export default function LiveMonitor() {
           )}
         </tbody>
       </table>
+
+      {/* Manual Question Selection Screen / Modal Overlay */}
+      {changeStudent && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px',
+          }}
+          onClick={() => setChangeStudent(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              width: '100%',
+              maxWidth: '850px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '2px solid #000000',
+              borderRadius: 0,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid #E4E4E7',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#000000' }}>
+                    Assign Question to Student
+                  </h2>
+                  <span
+                    style={{
+                      background: '#000000',
+                      color: '#FFFFFF',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '3px 8px',
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Faculty Override
+                  </span>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 13, color: '#52525B' }}>
+                  Student: <b style={{ color: '#000000' }}>{changeStudent.name}</b> ({changeStudent.username})
+                  <span style={{ margin: '0 8px', color: '#D4D4D8' }}>•</span>
+                  Currently Assigned: <span style={{ fontWeight: 800, color: '#FF1818' }}>{changeStudent.position_str || ('Q' + changeStudent.position)}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setChangeStudent(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 22,
+                  cursor: 'pointer',
+                  color: '#71717A',
+                  padding: '0 4px',
+                  lineHeight: 1,
+                }}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Filter / Search Bar */}
+            <div
+              style={{
+                padding: '12px 24px',
+                background: '#FAFAFA',
+                borderBottom: '1px solid #E4E4E7',
+                display: 'flex',
+                gap: 12,
+                alignItems: 'center',
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Filter questions by number or keywords..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  fontSize: 13,
+                  border: '1px solid #E4E4E7',
+                  borderRadius: 0,
+                  outline: 'none',
+                  backgroundColor: '#FFFFFF',
+                }}
+                autoFocus
+              />
+              <div style={{ fontSize: 12, color: '#71717A', whiteSpace: 'nowrap' }}>
+                Showing {filteredQuestions.length} of {examQuestions.length} questions
+              </div>
+            </div>
+
+            {/* Questions List */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '16px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14,
+              }}
+            >
+              {examQuestions.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#71717A' }}>
+                  No questions available for this exam.
+                </div>
+              ) : filteredQuestions.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#71717A' }}>
+                  No questions matching "{searchQuery}".
+                </div>
+              ) : (
+                filteredQuestions.map((q) => {
+                  const isCurrent =
+                    changeStudent.position === q.q_no ||
+                    (changeStudent.assigned_qnos && changeStudent.assigned_qnos.includes(q.q_no));
+                  const assignedCount = students.filter(
+                    (st) =>
+                      st.position === q.q_no ||
+                      (st.assigned_qnos && st.assigned_qnos.includes(q.q_no))
+                  ).length;
+
+                  return (
+                    <div
+                      key={q.id}
+                      style={{
+                        border: isCurrent ? '2px solid #000000' : '1px solid #E4E4E7',
+                        backgroundColor: isCurrent ? '#FAFAFA' : '#FFFFFF',
+                        padding: 16,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 800,
+                              backgroundColor: '#000000',
+                              color: '#FFFFFF',
+                              padding: '4px 10px',
+                              letterSpacing: '0.02em',
+                            }}
+                          >
+                            Question {q.q_no}
+                          </span>
+                          {isCurrent && (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                backgroundColor: '#FF1818',
+                                color: '#FFFFFF',
+                                padding: '3px 8px',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              Currently Assigned
+                            </span>
+                          )}
+                          <span style={{ fontSize: 12, color: '#71717A' }}>
+                            Currently with {assignedCount} student{assignedCount === 1 ? '' : 's'}
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => handleAssignQuestion(q)}
+                          disabled={assigningQId != null || isCurrent}
+                          style={{
+                            background: isCurrent ? '#F4F4F5' : '#FF1818',
+                            color: isCurrent ? '#71717A' : '#FFFFFF',
+                            border: isCurrent ? '1px solid #E4E4E7' : '1px solid #FF1818',
+                            padding: '8px 16px',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: isCurrent ? 'default' : 'pointer',
+                            borderRadius: 0,
+                          }}
+                        >
+                          {assigningQId === q.id
+                            ? 'Assigning…'
+                            : isCurrent
+                            ? 'Already Assigned'
+                            : `Assign Question ${q.q_no}`}
+                        </button>
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 13,
+                          lineHeight: 1.6,
+                          color: '#27272A',
+                          whiteSpace: 'pre-wrap',
+                          backgroundColor: '#FAFAFA',
+                          padding: 12,
+                          border: '1px solid #F4F4F5',
+                          maxHeight: 180,
+                          overflowY: 'auto',
+                        }}
+                      >
+                        {q.body}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '14px 24px',
+                borderTop: '1px solid #E4E4E7',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                background: '#FAFAFA',
+              }}
+            >
+              <button
+                onClick={() => setChangeStudent(null)}
+                style={{
+                  ...style.btnSm,
+                  margin: 0,
+                  padding: '8px 16px',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <FacultyFooter />
     </div>
@@ -367,6 +747,7 @@ const style = {
   dot: { display: 'inline-block', width: 8, height: 8, borderRadius: 0, background: '#71717A', marginRight: 6 },
   dotOn: { background: '#FF1818' },
   btnSm: { background: '#FFFFFF', color: '#000000', border: '1px solid #E4E4E7', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
+  btnSmBlack: { background: '#000000', color: '#FFFFFF', border: '1px solid #000000', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
   btnSmGreen: { background: '#FF1818', color: '#FFFFFF', border: '1px solid #FF1818', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
   btnSmRed: { background: '#FF1818', color: '#FFFFFF', border: '1px solid #FF1818', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
   btnSmExport: { background: '#FFFFFF', color: '#000000', border: '1px solid #E4E4E7', padding: '6px 12px', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, marginRight: 6 },
